@@ -35,13 +35,14 @@ public class PlaceController {
      * @return a ResponseEntity containing a list of PlaceDTO objects representing nearby places
      */
     @GetMapping("/nearby")
-    public ResponseEntity<List<PlaceDTO>> getNearbyPlaces(
-            @RequestParam double latitude,
-            @RequestParam double longitude) {
+    public ResponseEntity<PlaceDTO> getNearbyPlace( // Name und Rückgabetyp anpassen
+                                                    @RequestParam double latitude,
+                                                    @RequestParam double longitude) {
 
-        // Rufe die Methode auf, die jetzt wieder eine Liste zurückgibt
-        List<PlaceDTO> nearbyPlaces = googleApiService.findNearbyPlaces(latitude, longitude);
-        return ResponseEntity.ok(nearbyPlaces);
+        // Methode mit korrektem Namen aufrufen und Optional behandeln
+        return googleApiService.findNearbyPlace(latitude, longitude)
+                .map(place -> ResponseEntity.ok(place))
+                .orElse(ResponseEntity.notFound().build());
     }
 
     /**

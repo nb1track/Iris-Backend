@@ -38,18 +38,17 @@ public class GoogleApiService {
     }
 
     /**
-     * Attempts to find a nearby place based on the given geographical coordinates.
-     * First, it uses the Places API to search for points of interest (POI) within
-     * a specified radius. If a POI is found, its details are retrieved and saved
-     * in the database if it does not already exist. If no POI is found, reverse
-     * geocoding is performed to derive an approximate address at the given location.
-     * The method then converts the found place or address into a PlaceDTO object
-     * and returns it.
+     * Finds nearby places within a specific radius around the given geographic coordinates and returns
+     * a list of corresponding place data transfer objects (DTOs).
      *
-     * @param latitude the latitude of the geographic location to search for places
-     * @param longitude the longitude of the geographic location to search for places
-     * @return an Optional containing a PlaceDTO with the details of the nearby place or
-     *         an empty Optional if no place could be found
+     * This method queries the Google Places API to identify places of interest near the specified
+     * latitude and longitude. The results are converted into PlaceDTO instances, and details are
+     * saved or updated in the database.
+     *
+     * @param latitude the latitude of the location to search nearby places
+     * @param longitude the longitude of the location to search nearby places
+     * @return a list of PlaceDTO objects representing nearby places. If an error occurs during the
+     *         API call or processing, an empty list is returned.
      */
     public Optional<PlaceDTO> findNearbyPlace(double latitude, double longitude) {
         try {
