@@ -15,39 +15,46 @@ import java.nio.charset.StandardCharsets;
 @Configuration
 public class FirebaseConfig {
 
-    // Die Umgebungsvariable SPRING_APPLICATION_JSON wird automatisch von Spring Boot geladen.
-    // Wir injizieren sie hier direkt als String.
-    // WICHTIG: Stelle sicher, dass die Umgebungsvariable in Cloud Run als SPRING_APPLICATION_JSON gesetzt ist
-    // und den vollständigen JSON-Inhalt deines Firebase Service Accounts enthält.
-    @Value("${SPRING_APPLICATION_JSON:}") // Standardwert ist leerer String, falls nicht gesetzt
+    /**
+     * Represents the Firebase service account JSON configuration required to initialize
+     * a FirebaseApp instance within the application. This value is injected from the
+     * environment variable `SPRING_APPLICATION_JSON`.
+     *
+     * The JSON typically contains configuration details, such as the private key and
+     * client email, necessary for authenticating with Firebase services.
+     *
+     * If this value is not provided or empty, the application will fail to initialize
+     * Firebase and throw an {@link IllegalStateException}.
+     */
+    @Value("${SPRING_APPLICATION_JSON:}")
     private String firebaseServiceAccountJson;
 
     /**
-     * Initializes and configures a FirebaseApp instance using the service account JSON
-     * provided through the `SPRING_APPLICATION_JSON` environment variable.
+     * Initializes and configures a FirebaseApp instance for the application.
+     * If a FirebaseApp instance has already been initialized, it returns the existing instance.
      *
-     * This method is responsible for setting up FirebaseOptions with the credentials
-     * parsed from the service account JSON. The Firebase application is then initialized
-     * with these options. If the `SPRING_APPLICATION_JSON` environment variable is not
-     * set or contains an empty value, the method will throw an {@link IllegalStateException}.
-     *
-     * @return A {@link FirebaseApp} instance configured with the specified credentials.
-     * @throws IOException If an I/O error occurs while processing the service account JSON.
-     * @throws IllegalStateException If the required environment variable is not set or is empty.
-     */
+     * This method uses the Firebase*/
     @Bean
     public FirebaseApp initializeFirebase() throws IOException {
         if (firebaseServiceAccountJson == null || firebaseServiceAccountJson.isEmpty()) {
-            throw new IllegalStateException("Firebase service account JSON not found in SPRING_APPLICATION_JSON environment variable.");
+            // Diese Exception wird geworfen, wenn die Umgebungsvariable nicht gesetzt ist.
+            // Nicht, wenn eine Datei nicht gefunden wird.
+            throw new IllegalStateException("Firebase service account JSON not found in SPRING_APPLICATION_JSON environment variable. Please ensure it's set in Cloud Run.");
         }
 
+        // Hier wird der String in einen InputStream umgewandelt
         InputStream serviceAccount = new ByteArrayInputStream(firebaseServiceAccountJson.getBytes(StandardCharsets.UTF_8));
 
         FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                // Optional: .setDatabaseUrl("https://your-project-id.firebaseio.com")
+                // .setDatabaseUrl("https://your-project-id.firebaseio.com") // Optional: uncomment if you use Realtime Database or older Firebase features
                 .build();
 
-        return FirebaseApp.initializeApp(options);
+        // Initialisiere die App nur, wenn sie noch nicht initialisiert wurde
+        if (FirebaseApp.getApps().isEmpty()) {
+            return FirebaseApp.initializeApp(options);
+        } else {
+            return FirebaseApp.getInstance(); // Gib die bereits initialisierte App zurück
+        }
     }
 }
