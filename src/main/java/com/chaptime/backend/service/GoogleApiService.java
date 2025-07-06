@@ -5,18 +5,18 @@ import com.chaptime.backend.repository.PlaceRepository;
 import com.google.maps.GeoApiContext;
 import com.google.maps.GeocodingApi;
 import com.google.maps.PlacesApi;
-import com.google.maps.model.GeocodingResult;
-import com.google.maps.model.LatLng;
-import com.google.maps.model.PlacesSearchResponse;
-import com.google.maps.model.PlacesSearchResult;
+import com.google.maps.model.*;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
+import com.chaptime.backend.dto.PlaceDTO;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class GoogleApiService {
@@ -26,58 +26,82 @@ public class GoogleApiService {
     private final PlaceRepository placeRepository;
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
+    /**
+     * Constructs a new instance of GoogleApiService.
+     *
+     * @param geoApiContext the GeoApiContext used to interact with the Google Maps API
+     * @param placeRepository the repository for managing Place entities in the database
+     */
     public GoogleApiService(GeoApiContext geoApiContext, PlaceRepository placeRepository) {
         this.geoApiContext = geoApiContext;
         this.placeRepository = placeRepository;
     }
 
-    public Optional<Place> findOrCreatePlaceForCoordinates(double latitude, double longitude) {
+    /**
+     * Attempts to find a nearby place based on the given geographical coordinates.
+     * First, it uses the Places API to search for points of interest (POI) within
+     * a specified radius. If a POI is found, its details are retrieved and saved
+     * in the database if it does not already exist. If no POI is found, reverse
+     * geocoding is performed to derive an approximate address at the given location.
+     * The method then converts the found place or address into a PlaceDTO object
+     * and returns it.
+     *
+     * @param latitude the latitude of the geographic location to search for places
+     * @param longitude the longitude of the geographic location to search for places
+     * @return an Optional containing a PlaceDTO with the details of the nearby place or
+     *         an empty Optional if no place could be found
+     */
+    public Optional<PlaceDTO> findNearbyPlace(double latitude, double longitude) {
         try {
             LatLng coords = new LatLng(latitude, longitude);
 
-            // Schritt 1: IMMER die bestmögliche Adresse via Reverse Geocoding holen
-            GeocodingResult[] geocodingResults = GeocodingApi.reverseGeocode(geoApiContext, coords).await();
-            if (geocodingResults.length == 0) {
-                logger.warn("Reverse Geocoding returned no results for coords: {}", coords);
-                return Optional.empty(); // Keine Adresse, kein Ort
-            }
-            // Wir merken uns die beste Adresse und die PlaceID von der Geocoding-Antwort
-            String preciseAddress = geocodingResults[0].formattedAddress;
-            String geocodingPlaceId = geocodingResults[0].placeId;
+            // Versuch 1: Finde einen POI
+            PlacesSearchResponse placesResponse = PlacesApi.nearbySearchQuery(geoApiContext, coords)
+                    .radius(75)
+                    .await();
 
-
-            // Schritt 2: SUCHE nach einem Point of Interest (POI) in der Nähe
-            PlacesSearchResponse placesResponse = PlacesApi.nearbySearchQuery(geoApiContext, coords).radius(50).await();
-
-            // Fall A: POI gefunden (z.B. "Bahnhof Münchenbuchsee")
+            // Fall A: POI gefunden
             if (placesResponse.results.length > 0) {
                 PlacesSearchResult topPlace = placesResponse.results[0];
-                // Wir nehmen die ID vom POI, weil sie spezifischer ist
-                return Optional.of(placeRepository.findByGooglePlaceId(topPlace.placeId).orElseGet(() -> {
+
+                // Hole die genaue Adresse für den gefundenen POI
+                GeocodingResult[] geocodingResults = GeocodingApi.reverseGeocode(geoApiContext, new LatLng(topPlace.geometry.location.lat, topPlace.geometry.location.lng)).await();
+                String preciseAddress = (geocodingResults.length > 0) ? geocodingResults[0].formattedAddress : topPlace.vicinity;
+
+                Place placeEntity = placeRepository.findByGooglePlaceId(topPlace.placeId).orElseGet(() -> {
                     Place newPlace = new Place();
                     newPlace.setGooglePlaceId(topPlace.placeId);
-                    newPlace.setName(topPlace.name);        // Der Name des Ortes
-                    newPlace.setAddress(preciseAddress);    // Die genaue Adresse
+                    newPlace.setName(topPlace.name);
+                    newPlace.setAddress(preciseAddress);
                     newPlace.setLocation(geometryFactory.createPoint(new Coordinate(topPlace.geometry.location.lng, topPlace.geometry.location.lat)));
                     return placeRepository.save(newPlace);
-                }));
+                });
+                PlaceDTO placeDTO = new PlaceDTO(placeEntity.getId(), placeEntity.getGooglePlaceId(), placeEntity.getName(), placeEntity.getAddress());
+                return Optional.of(placeDTO);
             }
-            // Fall B: Kein POI gefunden, wir verwenden die Daten von der Adress-Suche
+            // Fall B: Kein POI gefunden, nutze Reverse Geocoding
             else {
-                return Optional.of(placeRepository.findByGooglePlaceId(geocodingPlaceId).orElseGet(() -> {
-                    Place newPlace = new Place();
-                    newPlace.setGooglePlaceId(geocodingPlaceId);
-                    newPlace.setName(preciseAddress);       // Adresse als Name
-                    newPlace.setAddress(preciseAddress);    // Adresse als Adresse
-                    newPlace.setLocation(geometryFactory.createPoint(new Coordinate(longitude, latitude)));
-                    return placeRepository.save(newPlace);
-                }));
-            }
+                GeocodingResult[] geocodingResults = GeocodingApi.reverseGeocode(geoApiContext, coords).await();
+                if (geocodingResults.length > 0) {
+                    GeocodingResult topAddress = geocodingResults[0];
+                    String placeId = topAddress.placeId;
+                    String name = topAddress.formattedAddress.split(",")[0];
 
+                    Place placeEntity = placeRepository.findByGooglePlaceId(placeId).orElseGet(() -> {
+                        Place newPlace = new Place();
+                        newPlace.setGooglePlaceId(placeId);
+                        newPlace.setName(name);
+                        newPlace.setAddress(topAddress.formattedAddress);
+                        newPlace.setLocation(geometryFactory.createPoint(new Coordinate(longitude, latitude)));
+                        return placeRepository.save(newPlace);
+                    });
+                    PlaceDTO placeDTO = new PlaceDTO(placeEntity.getId(), placeEntity.getGooglePlaceId(), placeEntity.getName(), placeEntity.getAddress());
+                    return Optional.of(placeDTO);
+                }
+            }
         } catch (Exception e) {
             logger.error("Error calling Google APIs: {}", e.getMessage());
         }
-
         return Optional.empty();
     }
 }

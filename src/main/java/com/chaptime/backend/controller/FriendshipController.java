@@ -3,11 +3,13 @@ package com.chaptime.backend.controller;
 import com.chaptime.backend.dto.FriendRequestDTO;
 import com.chaptime.backend.dto.FriendshipActionDTO;
 import com.chaptime.backend.dto.UserDTO;
+import com.chaptime.backend.model.User;
 import com.chaptime.backend.service.FriendshipService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import java.util.UUID;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/api/v1/friends")
@@ -15,14 +17,31 @@ public class FriendshipController {
 
     private final FriendshipService friendshipService;
 
+    /**
+     * Constructor for FriendshipController.
+     *
+     * @param friendshipService the service used to handle friendship-related operations
+     */
     public FriendshipController(FriendshipService friendshipService) {
         this.friendshipService = friendshipService;
     }
 
+    /**
+     * Handles sending a friend request from the authenticated user to another user specified by their ID.
+     * The method validates the location and proximity of both users before processing the request.
+     *
+     * @param requester the currently authenticated user sending the friend request, extracted from the authentication token
+     * @param request the data transfer object containing the ID of the user who will receive the friend request
+     * @return a ResponseEntity containing a success message if the request was sent successfully,
+     *         or an error message with the appropriate HTTP status if an exception occurs
+     */
     @PostMapping("/request")
-    public ResponseEntity<String> sendFriendRequest(@RequestBody FriendRequestDTO request) {
+    public ResponseEntity<String> sendFriendRequest(
+            @AuthenticationPrincipal User requester, // Holt den User aus dem Token
+            @RequestBody FriendRequestDTO request) {
         try {
-            friendshipService.sendFriendRequest(request);
+            // Übergibt den angemeldeten User und die ID des Empfängers an den Service
+            friendshipService.sendFriendRequest(requester, request.addresseeId());
             return ResponseEntity.ok("Friend request sent successfully.");
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(e.getMessage());
@@ -31,21 +50,45 @@ public class FriendshipController {
         }
     }
 
+    /**
+     * Handles accepting a pending friendship request by an authenticated user.
+     *
+     * @param acceptor the currently authenticated user accepting the friend request, extracted from the authentication token
+     * @param request the data transfer object containing the ID of the friendship to be accepted
+     * @return a ResponseEntity containing a success message if the request was accepted successfully,
+     *         a bad request message if the request is invalid, or a forbidden message for security violations
+     */
     @PostMapping("/accept")
-    public ResponseEntity<String> acceptFriendRequest(@RequestBody FriendshipActionDTO request) {
+    public ResponseEntity<String> acceptFriendRequest(
+            @AuthenticationPrincipal User acceptor, // Angemeldeten User holen
+            @RequestBody FriendshipActionDTO request) {
         try {
-            friendshipService.acceptFriendRequest(request);
+            friendshipService.acceptFriendRequest(request, acceptor); // User an Service übergeben
             return ResponseEntity.ok("Friendship accepted.");
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         }
     }
 
-
-
+    /**
+     * Retrieves a list of friends for the currently authenticated user.
+     *
+     * @param user the authenticated user whose friends are being retrieved, extracted from the authentication token
+     * @return a ResponseEntity containing a list of UserDTO objects representing the user's friends,
+     *         or an unauthorized status if the user is not authenticated
+     */
     @GetMapping
-    public ResponseEntity<List<UserDTO>> getFriends(@RequestParam UUID userId) {
-        List<UserDTO> friends = friendshipService.getFriendsAsDTO(userId);
+    public ResponseEntity<List<UserDTO>> getFriends(@AuthenticationPrincipal User user) {
+        // @AuthenticationPrincipal injiziert den User, der durch das Token authentifiziert wurde
+        if (user == null) {
+            // Sollte nie passieren, wenn der Security-Filter korrekt arbeitet, aber eine gute Absicherung
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // Wir benutzen die ID des angemeldeten Users
+        List<UserDTO> friends = friendshipService.getFriendsAsDTO(user.getId());
         return ResponseEntity.ok(friends);
     }
 }

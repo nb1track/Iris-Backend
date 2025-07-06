@@ -3,11 +3,26 @@ package com.chaptime.backend.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
 import org.locationtech.jts.geom.Point;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * Represents a user entity in the system.
+ *
+ * The User entity models a user with unique identifiers and associated metadata.
+ * It includes details such as:
+ * - A unique UUID as the primary identifier.
+ * - A Firebase UID for authentication purposes.
+ * - A unique username, restricted to a maximum length of 50 characters.
+ * - A unique and validated email address.
+ * - The timestamp indicating when the user was created.
+ * - The user's last known geographical location, represented in Point format.
+ * - The timestamp of the last update to the user's location.
+ *
+ * The creation timestamp is automatically set before persisting a new User entity.
+ * The generated id value is automatically created and managed by the persistence layer.
+ */
 @Entity
 @Table(name = "users") // Wichtig: Name der Tabelle in der DB
 @Getter // Lombok-Annotation für automatische Getter

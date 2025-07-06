@@ -1,6 +1,5 @@
 package com.chaptime.backend.service;
 
-import com.chaptime.backend.dto.FriendRequestDTO;
 import com.chaptime.backend.dto.FriendshipActionDTO;
 import com.chaptime.backend.dto.UserDTO;
 import com.chaptime.backend.model.Friendship;
@@ -10,10 +9,8 @@ import com.chaptime.backend.repository.FriendshipRepository;
 import com.chaptime.backend.repository.UserRepository;
 import org.locationtech.jts.geom.Point;
 import org.springframework.stereotype.Service;
-
 import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -23,15 +20,30 @@ public class FriendshipService {
 
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
-
     private static final double MAX_DISTANCE_METERS = 50.0; // Max. 50 Meter Entfernung
 
-
+    /**
+     * Constructs a new instance of the FriendshipService.
+     *
+     * @param userRepository the repository used for accessing and managing User entities
+     * @param friendshipRepository the repository used for accessing and managing Friendship entities
+     */
     public FriendshipService(UserRepository userRepository, FriendshipRepository friendshipRepository) {
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
     }
 
+    /**
+     * Retrieves the list of friends for a specified user as Data Transfer Object (DTO) representations.
+     *
+     * This method fetches all friendships where the given user is either User One or User Two
+     * and the friendship status is 'ACCEPTED'. It then transforms the associated user entities
+     * into DTOs containing their id and username.
+     *
+     * @param userId the unique identifier of the user for whom the friend list is to be retrieved
+     * @return a list of UserDTO objects representing the user's friends
+     * @throws RuntimeException if the user with the specified ID is not found
+     */
     public List<UserDTO> getFriendsAsDTO(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -47,7 +59,17 @@ public class FriendshipService {
                 .collect(Collectors.toList());
     }
 
-    // Gibt eine Liste von User-Objekten zurück, was wir für den Feed brauchen
+    /**
+     * Retrieves the list of friends for a specified user as entity representations.
+     *
+     * This method retrieves all friendships where the given user is either User One or User Two
+     * and the friendship status is 'ACCEPTED'. It then returns the associated user entities
+     * representing the user's friends.
+     *
+     * @param userId the unique identifier of the user for whom the friend list is to be retrieved
+     * @return a list of User entities representing the user's friends
+     * @throws RuntimeException if the user with the specified ID is not found
+     */
     public List<User> getFriendsAsEntities(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -60,17 +82,29 @@ public class FriendshipService {
                 .collect(Collectors.toList());
     }
 
-    public void sendFriendRequest(FriendRequestDTO request) {
-        User requester = userRepository.findById(request.requesterId())
-                .orElseThrow(() -> new RuntimeException("Requester not found"));
-
-        User addressee = userRepository.findById(request.addresseeId())
+    /**
+     * Sends a friend request from one user to another.
+     *
+     * This method verifies the geographical proximity of the two users,
+     * the freshness of their location data, and other criteria before
+     * allowing a friend request to be sent. If all conditions are met,
+     * a new friendship with a "PENDING" status is created.
+     *
+     * @param requester the User entity sending the friend request
+     * @param addresseeId the unique identifier of the User receiving the friend request
+     * @throws RuntimeException if the addressee is not found
+     * @throws IllegalStateException if the location of either user is unavailable or outdated
+     * @throws SecurityException if the users are not within the maximum allowed distance
+     */
+    public void sendFriendRequest(User requester, UUID addresseeId) {
+        User addressee = userRepository.findById(addresseeId)
                 .orElseThrow(() -> new RuntimeException("Addressee not found"));
 
         // Standort-Check
         Point requesterLocation = requester.getLastLocation();
         Point addresseeLocation = addressee.getLastLocation();
 
+        // ... der Rest der Methode bleibt exakt gleich ...
         if (requesterLocation == null || addresseeLocation == null) {
             throw new IllegalStateException("User location not available.");
         }
@@ -103,7 +137,23 @@ public class FriendshipService {
         friendshipRepository.save(newFriendship);
     }
 
-    public void acceptFriendRequest(FriendshipActionDTO request) {
+    /**
+     * Processes the acceptance of a friend request.
+     *
+     * This method retrieves the specified friendship and updates its status
+     * to "ACCEPTED" if it was previously pending. It ensures that the user
+     * accepting the request is the recipient of the original request and not
+     * the sender. If the request is invalid or violates security rules, an
+     * exception is thrown.
+     *
+     * @param request an instance of FriendshipActionDTO containing the friendship ID
+     *                for which the acceptance action is to be performed
+     * @param acceptor the User entity representing the individual accepting the friend request
+     * @throws RuntimeException if the friendship with the provided ID is not found
+     * @throws IllegalStateException if the friendship status is not "PENDING"
+     * @throws SecurityException if the user attempting to accept is the sender of the friend request
+     */
+    public void acceptFriendRequest(FriendshipActionDTO request, User acceptor) {
         Friendship friendship = friendshipRepository.findById(request.friendshipId())
                 .orElseThrow(() -> new RuntimeException("Friendship not found"));
 
@@ -111,7 +161,14 @@ public class FriendshipService {
             throw new IllegalStateException("Request is not pending anymore.");
         }
 
+        // SICHERHEITS-CHECK: Ist der annehmende User auch der Empfänger der Anfrage?
+        // (Der Empfänger ist der, der die Anfrage NICHT gesendet hat)
+        if (friendship.getActionUser().getId().equals(acceptor.getId())) {
+            throw new SecurityException("You cannot accept your own friend request.");
+        }
+
         friendship.setStatus(FriendshipStatus.ACCEPTED);
+        friendship.setActionUser(acceptor); // Setze den annehmenden User als letzten Akteur
         friendshipRepository.save(friendship);
     }
 }

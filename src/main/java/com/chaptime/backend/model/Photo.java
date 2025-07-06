@@ -10,6 +10,25 @@ import org.locationtech.jts.geom.Point;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * Represents a Photo entity in the system.
+ *
+ * The Photo entity models a photo uploaded by a user to a specific location or place.
+ * It stores metadata about the photo, such as its visibility, upload time, expiration,
+ * and storage details.
+ *
+ * Each Photo object contains the following information:
+ * - A unique identifier for the photo.
+ * - The user who uploaded the photo.
+ * - An optional associated place.
+ * - Geographical location of where the photo was taken or uploaded.
+ * - Visibility level, which determines who can view the photo.
+ * - URL of the storage location where the photo file is saved.
+ * - Timestamp for when the photo was uploaded.
+ * - Timestamp for when the photo expires and becomes inaccessible.
+ *
+ * The upload timestamp is automatically set upon creating a new Photo instance in the database.
+ */
 @Entity
 @Table(name = "photos")
 @Getter
