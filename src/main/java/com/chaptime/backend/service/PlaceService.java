@@ -6,6 +6,8 @@ import com.chaptime.backend.repository.PlaceRepository;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.time.OffsetDateTime;
+import java.util.Optional;
 
 @Service
 public class PlaceService {
@@ -31,8 +33,11 @@ public class PlaceService {
      * @param radius the radius (in meters) around the given location within which to search for public galleries
      * @return a list of PlaceDTO objects representing public galleries within the specified radius
      */
-    public List<PlaceDTO> getPublicGalleries(double latitude, double longitude, double radius) {
-        List<Place> places = placeRepository.findPlacesWithActivePublicPhotos(latitude, longitude, radius);
+    public List<PlaceDTO> getPublicGalleries(double latitude, double longitude, double radius, Optional<OffsetDateTime> timestamp) {
+        List<Place> places;
+
+            places = placeRepository.findPlacesWithActivePublicPhotosInTimeWindow(latitude, longitude, radius, timestamp.get());
+
 
         return places.stream()
                 .map(place -> new PlaceDTO(

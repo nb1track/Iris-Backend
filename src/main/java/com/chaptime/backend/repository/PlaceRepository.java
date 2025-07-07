@@ -3,6 +3,8 @@ package com.chaptime.backend.repository;
 import com.chaptime.backend.model.Place;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,12 +29,13 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
     SELECT DISTINCT p.* FROM places p
     JOIN photos ph ON p.id = ph.place_id
     WHERE ph.visibility = 'PUBLIC'
-      AND ph.expires_at > NOW()
+      AND ph.uploaded_at BETWEEN (:timestamp - interval '5 hours') AND :timestamp
       AND ST_DWithin(p.location, ST_MakePoint(:longitude, :latitude)::geography, :radiusInMeters)
     """, nativeQuery = true)
-    List<Place> findPlacesWithActivePublicPhotos(
+    List<Place> findPlacesWithActivePublicPhotosInTimeWindow(
             @Param("latitude") double latitude,
             @Param("longitude") double longitude,
-            @Param("radiusInMeters") double radiusInMeters
+            @Param("radiusInMeters") double radiusInMeters,
+            @Param("timestamp") OffsetDateTime timestamp
     );
 }

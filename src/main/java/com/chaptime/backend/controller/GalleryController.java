@@ -2,13 +2,16 @@ package com.chaptime.backend.controller;
 
 import com.chaptime.backend.dto.PlaceDTO;
 import com.chaptime.backend.service.PlaceService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/galleries")
@@ -40,9 +43,11 @@ public class GalleryController {
     public ResponseEntity<List<PlaceDTO>> getPublicGalleries(
             @RequestParam double latitude,
             @RequestParam double longitude,
-            @RequestParam(defaultValue = "25000") double radius // 25km als Standard-Suchradius
+            @RequestParam(defaultValue = "25") double radius,
+            // Der neue, optionale Zeitstempel-Parameter im ISO-Format (z.B. 2025-07-07T10:30:00Z)
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Optional<OffsetDateTime> timestamp
     ) {
-        List<PlaceDTO> galleries = placeService.getPublicGalleries(latitude, longitude, radius);
+        List<PlaceDTO> galleries = placeService.getPublicGalleries(latitude, longitude, radius, timestamp);
         return ResponseEntity.ok(galleries);
     }
 }
