@@ -1,13 +1,11 @@
 package com.chaptime.backend.controller;
 
+import com.chaptime.backend.dto.HistoricalSearchRequestDTO;
 import com.chaptime.backend.dto.PlaceDTO;
 import com.chaptime.backend.service.PlaceService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -29,25 +27,24 @@ public class GalleryController {
     }
 
     /**
-     * Retrieves a list of public galleries based on the specified geographical coordinates
-     * and search radius. The results are filtered to include only galleries with active,
-     * publicly available photos.
+     * Retrieves a list of historical galleries based on the provided search request and radius.
      *
-     * @param latitude the latitude of the location to search around
-     * @param longitude the longitude of the location to search around
-     * @param radius the search radius in meters (default is 25000 meters if not specified)
+     * This method takes in a search request containing a list of historical points
+     * and searches for galleries that match the historical context within the specified
+     * radius. Results are returned as a list of PlaceDTO objects.
+     *
+     * @param searchRequest the search request containing historical points for the query
+     * @param radius the radius in meters within which to search for historical galleries,
+     *               defaults to 25000 if not specified
      * @return a ResponseEntity containing a list of PlaceDTO objects representing the
-     *         public galleries within the specified radius
+     *         historical galleries found, or an empty list if no matches are found
      */
-    @GetMapping
-    public ResponseEntity<List<PlaceDTO>> getPublicGalleries(
-            @RequestParam double latitude,
-            @RequestParam double longitude,
-            @RequestParam(defaultValue = "25") double radius,
-            // Der neue, optionale Zeitstempel-Parameter im ISO-Format (z.B. 2025-07-07T10:30:00Z)
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Optional<OffsetDateTime> timestamp
-    ) {
-        List<PlaceDTO> galleries = placeService.getPublicGalleries(latitude, longitude, radius, timestamp);
+    @PostMapping("/historical-search")
+    public ResponseEntity<List<PlaceDTO>> getHistoricalGalleries(
+            @RequestBody HistoricalSearchRequestDTO searchRequest,
+            @RequestParam(defaultValue = "25000") double radius) {
+
+        List<PlaceDTO> galleries = placeService.findHistoricalGalleriesBatch(searchRequest.history(), radius);
         return ResponseEntity.ok(galleries);
     }
 }

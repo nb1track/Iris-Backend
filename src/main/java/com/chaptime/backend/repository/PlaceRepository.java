@@ -39,4 +39,21 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             @Param("radiusInMeters") double radiusInMeters,
             @Param("timestamp") OffsetDateTime timestamp
     );
+
+    @Query(value = """
+        SELECT DISTINCT p.*
+        FROM
+            places p
+        JOIN
+            photos ph ON p.id = ph.place_id,
+            jsonb_to_recordset(:historyJson::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
+        WHERE
+            ph.visibility = 'PUBLIC'
+            AND ST_DWithin(p.location, ST_MakePoint(h.longitude, h.latitude)::geography, :radiusInMeters)
+            AND ph.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
+        """, nativeQuery = true)
+    List<Place> findPlacesMatchingHistoricalBatch(
+            @Param("historyJson") String historyJson,
+            @Param("radiusInMeters") double radiusInMeters
+    );
 }

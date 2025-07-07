@@ -1,5 +1,6 @@
 package com.chaptime.backend.service;
 
+import com.chaptime.backend.dto.HistoricalPointDTO;
 import com.chaptime.backend.dto.PhotoResponseDTO;
 import com.chaptime.backend.model.Photo;
 import com.chaptime.backend.model.Place;
@@ -7,6 +8,8 @@ import com.chaptime.backend.model.User;
 import com.chaptime.backend.model.enums.PhotoVisibility;
 import com.chaptime.backend.repository.PhotoRepository;
 import com.chaptime.backend.repository.PlaceRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
@@ -18,12 +21,14 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 public class PhotoService {
 
+    private final ObjectMapper objectMapper;
     private final PhotoRepository photoRepository;
     private final PlaceRepository placeRepository;
     private final FriendshipService friendshipService;
@@ -41,12 +46,13 @@ public class PhotoService {
      * @param googleApiService the service for interacting with Google APIs
      * @param gcsStorageService the service for handling file storage operations in Google Cloud Storage
      */
-    public PhotoService(PhotoRepository photoRepository, PlaceRepository placeRepository, FriendshipService friendshipService, GoogleApiService googleApiService, GcsStorageService gcsStorageService) {
+    public PhotoService(PhotoRepository photoRepository, PlaceRepository placeRepository, FriendshipService friendshipService, GoogleApiService googleApiService, GcsStorageService gcsStorageService, ObjectMapper objectMapper) {
         this.photoRepository = photoRepository;
         this.placeRepository = placeRepository;
         this.friendshipService = friendshipService;
         this.googleApiService = googleApiService;
         this.gcsStorageService = gcsStorageService;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -99,28 +105,6 @@ public class PhotoService {
         }
     }
 
-
-    /**
-     * Finds and retrieves a list of public photos that are discoverable within a specified radius
-     * of a given geographic location defined by latitude and longitude.
-     *
-     * @param latitude the latitude of the center point for the search
-     * @param longitude the longitude of the center point for the search
-     * @param radiusInMeters the radius (in meters) within which to search for photos
-     * @return a list of PhotoResponseDTO objects, where each DTO contains information
-     *         about a discoverable photo such as its ID, storage URL, and uploader's username
-     */
-    public List<PhotoResponseDTO> findDiscoverablePhotos(double latitude, double longitude, double radiusInMeters) {
-        List<Photo> photos = photoRepository.findPublicPhotosWithinRadius(latitude, longitude, radiusInMeters);
-        return photos.stream()
-                .map(photo -> new PhotoResponseDTO(
-                        photo.getId(),
-                        photo.getStorageUrl(),
-                        photo.getUploader().getUsername()
-                ))
-                .collect(Collectors.toList());
-    }
-
     /**
      * Retrieves a list of photos that are visible to the specified user's friends.
      * This method fetches the user's friends, then retrieves photos uploaded
@@ -142,39 +126,6 @@ public class PhotoService {
                         PhotoVisibility.FRIENDS,
                         OffsetDateTime.now()
                 );
-        return photos.stream()
-                .map(photo -> new PhotoResponseDTO(
-                        photo.getId(),
-                        photo.getStorageUrl(),
-                        photo.getUploader().getUsername()
-                ))
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Retrieves a list of public photos associated with a specific place.
-     * The method ensures the place exists, then fetches photos that are visible to the public,
-     * have not expired, and are ordered by upload time in descending order.
-     *
-     * @param placeId the unique identifier of the place for which photos are to be retrieved
-     * @return a list of PhotoResponseDTO objects containing information about the photos
-     *         (e.g., their ID, storage URL, and uploader's username)
-     * @throws RuntimeException if the place with the specified ID is not found
-     */
-    public List<PhotoResponseDTO> getPhotosForPlace(Long placeId) {
-        // Finde den Ort, um sicherzustellen, dass er existiert
-        Place place = placeRepository.findById(placeId)
-                .orElseThrow(() -> new RuntimeException("Place not found"));
-
-        // Finde alle passenden Fotos für diesen Ort
-        List<Photo> photos = photoRepository
-                .findAllByPlaceAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(
-                        place,
-                        PhotoVisibility.PUBLIC,
-                        OffsetDateTime.now()
-                );
-
-        // Wandle die Ergebnisse in DTOs um
         return photos.stream()
                 .map(photo -> new PhotoResponseDTO(
                         photo.getId(),
@@ -214,5 +165,38 @@ public class PhotoService {
 
         // 4. Lösche den Eintrag aus der Datenbank
         photoRepository.delete(photo);
+    }
+
+    /**
+     * Finds historical photos for a specific place based on the given list of historical points.
+     *
+     * @param placeId the unique identifier of the place for which historical photos are being requested
+     * @param history a list of historical points containing data to match historical photos for the specified place
+     * @return a list of PhotoResponseDTO objects containing information about historical photos matching the given place and historical points;
+     *         returns an empty list if no matching photos are found or if the history list is null or empty
+     */
+    @Transactional(readOnly = true)
+    public List<PhotoResponseDTO> findHistoricalPhotosForPlace(Long placeId, List<HistoricalPointDTO> history) {
+        if (history == null || history.isEmpty()) {
+            return List.of();
+        }
+        try {
+            // Wandle die Liste der Punkte in einen JSON-String um
+            String historyJson = objectMapper.writeValueAsString(history);
+
+            List<Photo> photos = photoRepository.findPhotosForPlaceMatchingHistoricalBatch(placeId, historyJson);
+
+            return photos.stream()
+                    .map(photo -> new PhotoResponseDTO(
+                            photo.getId(),
+                            photo.getStorageUrl(),
+                            photo.getUploader().getUsername()
+                    ))
+                    .collect(Collectors.toList());
+
+        } catch (JsonProcessingException e) {
+            // Hier könntest du einen Fehler loggen
+            throw new RuntimeException("Error processing historical photo data", e);
+        }
     }
 }

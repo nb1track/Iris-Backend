@@ -28,21 +28,32 @@ import java.util.UUID;
 @Repository
 public interface PhotoRepository extends JpaRepository<Photo, UUID> {
 
-    @Query(value = "SELECT * FROM photos p WHERE p.visibility = 'PUBLIC' AND p.expires_at > NOW() AND ST_DWithin(p.location, ST_MakePoint(:longitude, :latitude)::geography, :radiusInMeters)", nativeQuery = true)
-    List<Photo> findPublicPhotosWithinRadius(
-            @Param("latitude") double latitude,
-            @Param("longitude") double longitude,
-            @Param("radiusInMeters") double radiusInMeters
+
+    @Query(value = """
+    SELECT DISTINCT ph.*
+    FROM
+        photos ph,
+        jsonb_to_recordset(:historyJson::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
+    WHERE
+        ph.place_id = :placeId
+        AND ph.visibility = 'PUBLIC'
+        -- Prüfe, ob der historische Punkt des Users in der Nähe des Ortes war (z.B. 500m Radius)
+        AND ST_DWithin(
+            (SELECT location FROM places WHERE id = :placeId),
+            ST_MakePoint(h.longitude, h.latitude)::geography,
+            500
+        )
+        -- Prüfe, ob das Foto im 5-Stunden-Fenster vor diesem Besuch hochgeladen wurde
+        AND ph.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
+    ORDER BY ph.uploaded_at DESC
+    """, nativeQuery = true)
+    List<Photo> findPhotosForPlaceMatchingHistoricalBatch(
+            @Param("placeId") Long placeId,
+            @Param("historyJson") String historyJson
     );
 
     List<Photo> findAllByUploaderInAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(
             List<User> uploaders,
-            PhotoVisibility visibility,
-            OffsetDateTime currentTime
-    );
-
-    List<Photo> findAllByPlaceAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(
-            Place place,
             PhotoVisibility visibility,
             OffsetDateTime currentTime
     );

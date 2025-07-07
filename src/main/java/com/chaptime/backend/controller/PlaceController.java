@@ -1,12 +1,17 @@
 package com.chaptime.backend.controller;
 
+import com.chaptime.backend.dto.HistoricalSearchRequestDTO;
 import com.chaptime.backend.dto.PhotoResponseDTO;
 import com.chaptime.backend.dto.PlaceDTO;
 import com.chaptime.backend.service.GoogleApiService;
 import com.chaptime.backend.service.PhotoService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
 
 @RestController
@@ -45,17 +50,21 @@ public class PlaceController {
     }
 
     /**
-     * Retrieves a list of public photos associated with a specific place.
-     * The photos are ordered by upload time in descending order and include details
-     * such as the photo ID, storage URL, and uploader's username. This endpoint is used
-     * to fetch photos that are visible to the public and not expired.
+     * Retrieves a list of historical photos for a specific place based on the provided historical search data.
      *
-     * @param placeId the unique identifier of the place for which the photos are to be retrieved
-     * @return a ResponseEntity containing a list of PhotoResponseDTO objects, each representing a photo
+     * @param placeId the unique identifier of the place for which historical photos are being requested
+     * @param searchRequest the request payload containing historical search data, including a list of historical points
+     * @return a ResponseEntity containing a list of PhotoResponseDTO objects representing the historical photos
      */
-    @GetMapping("/{placeId}/photos")
-    public ResponseEntity<List<PhotoResponseDTO>> getPhotosForPlace(@PathVariable Long placeId) {
-        List<PhotoResponseDTO> photos = photoService.getPhotosForPlace(placeId);
+    @PostMapping("/{placeId}/historical-photos")
+    public ResponseEntity<List<PhotoResponseDTO>> getHistoricalPhotosForPlace(
+            @PathVariable Long placeId,
+            @RequestBody HistoricalSearchRequestDTO searchRequest
+    ) {
+        List<PhotoResponseDTO> photos = photoService.findHistoricalPhotosForPlace(
+                placeId,
+                searchRequest.history()
+        );
         return ResponseEntity.ok(photos);
     }
 }

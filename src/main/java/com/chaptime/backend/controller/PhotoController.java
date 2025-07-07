@@ -77,26 +77,6 @@ public class PhotoController {
     }
 
     /**
-     * Retrieves a list of photos that are discoverable within a specified radius
-     * from a given geographic coordinate (latitude and longitude).
-     *
-     * @param latitude the latitude of the geographical point to search around
-     * @param longitude the longitude of the geographical point to search around
-     * @param radius the search radius in meters; defaults to 500 meters if not specified
-     * @return a {@link ResponseEntity} containing a list of {@link PhotoResponseDTO} objects
-     *         representing the discoverable photos
-     */
-    @GetMapping("/discover")
-    public ResponseEntity<List<PhotoResponseDTO>> getDiscoverablePhotos(
-            @RequestParam double latitude,
-            @RequestParam double longitude,
-            @RequestParam(defaultValue = "500.0") double radius // Radius in Metern, 500m ist der Standard
-    ) {
-        List<PhotoResponseDTO> discoverablePhotos = photoService.findDiscoverablePhotos(latitude, longitude, radius);
-        return ResponseEntity.ok(discoverablePhotos);
-    }
-
-    /**
      * Retrieves the feed of photos shared by friends of the authenticated user.
      *
      * @param user the authenticated user whose friends' feed is to be retrieved,

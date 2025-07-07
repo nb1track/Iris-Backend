@@ -1,5 +1,7 @@
 package com.chaptime.backend.dto;
 
+import java.util.List;
+
 /**
  * Represents a data transfer object (DTO) for a specific place.
  *
@@ -18,5 +20,6 @@ public record PlaceDTO(
         Long id, // Unsere interne Datenbank-ID
         String googlePlaceId,
         String name,
-        String address
+        String address,
+        List<PhotoResponseDTO> photos // NEU: Eine Liste der zugehörigen Fotos
 ) {}
