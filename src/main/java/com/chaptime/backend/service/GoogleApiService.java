@@ -74,7 +74,11 @@ public class GoogleApiService {
                         Place savedPlace = placeRepository.save(place);
 
                         // Gib ein DTO mit den wichtigsten Infos zurück
-                        return new PlaceDTO(savedPlace.getId(), savedPlace.getGooglePlaceId(), savedPlace.getName(), savedPlace.getAddress());
+                        return new PlaceDTO(savedPlace.getId(),
+                                savedPlace.getGooglePlaceId(),
+                                savedPlace.getName(),
+                                savedPlace.getAddress(),
+                                null);
                     })
                     .collect(Collectors.toList());
 

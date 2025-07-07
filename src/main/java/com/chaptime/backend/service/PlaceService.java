@@ -61,7 +61,8 @@ public class PlaceService {
                             place.getId(),
                             place.getGooglePlaceId(),
                             place.getName(),
-                            place.getAddress()
+                            place.getAddress(),
+                            null // <-- HIER DIE KORREKTUR
                     ))
                     .collect(Collectors.toList());
 
@@ -95,7 +96,8 @@ public class PlaceService {
                         place.getId(),
                         place.getGooglePlaceId(),
                         place.getName(),
-                        place.getAddress()
+                        place.getAddress(),
+                        null // <-- HIER DIE KORREKTUR
                 ))
                 .collect(Collectors.toList());
     }
