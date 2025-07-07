@@ -25,13 +25,17 @@ public class PlaceService {
     }
 
     /**
-     * Retrieves a list of public galleries within a specified radius of a given geographical location.
-     * The method filters places that have active public photos and maps them to a list of PlaceDTO objects.
+     * Retrieves a list of public galleries within a specified radius of a given location and time window.
      *
-     * @param latitude the latitude of the central point to search for public galleries
-     * @param longitude the longitude of the central point to search for public galleries
-     * @param radius the radius (in meters) around the given location within which to search for public galleries
-     * @return a list of PlaceDTO objects representing public galleries within the specified radius
+     * The method filters places based on their geographical proximity to the provided latitude and longitude,
+     * checks if they have active public photos within the specified time window, and converts the results into
+     * a list of PlaceDTO objects.
+     *
+     * @param latitude the latitude of the center point for the search area
+     * @param longitude the longitude of the center point for the search area
+     * @param radius the radius (in meters) around the specified location to search for public galleries
+     * @param timestamp an optional timestamp used to define the time window for filtering active public photos
+     * @return a list of PlaceDTO objects representing the public galleries that meet the specified criteria
      */
     public List<PlaceDTO> getPublicGalleries(double latitude, double longitude, double radius, Optional<OffsetDateTime> timestamp) {
         List<Place> places;

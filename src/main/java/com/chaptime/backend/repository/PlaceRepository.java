@@ -13,13 +13,14 @@ import java.util.List;
 /**
  * Repository interface for managing Place entities.
  *
- * This interface provides methods for interacting with the `places` table in the database.
- * It extends JpaRepository, allowing for standard CRUD operations and includes additional
- * custom queries for more specific use cases.
+ * This interface provides methods for interacting with the `places` table
+ * in the database. It extends JpaRepository, inheriting standard CRUD
+ * operations, and defines custom query methods for specific use cases.
  *
  * Key functionalities:
- * - Retrieve a Place by its Google Place ID.
- * - Find places within a specified geographical radius that have active public photos.
+ * - Retrieve a Place entity by its unique Google Place ID.
+ * - Find places that have active public photos within a geographical radius
+ *   during a specified time window.
  */
 @Repository
 public interface PlaceRepository extends JpaRepository<Place, Long> {

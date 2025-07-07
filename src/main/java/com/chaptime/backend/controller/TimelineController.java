@@ -22,11 +22,25 @@ public class TimelineController {
     private final TimelineEntryRepository timelineEntryRepository;
     private final PhotoRepository photoRepository;
 
+    /**
+     * Constructs a new TimelineController with the specified dependencies.
+     *
+     * @param timelineEntryRepository the repository responsible for managing TimelineEntry entities
+     * @param photoRepository the repository responsible for managing Photo entities
+     */
     public TimelineController(TimelineEntryRepository timelineEntryRepository, PhotoRepository photoRepository) {
         this.timelineEntryRepository = timelineEntryRepository;
         this.photoRepository = photoRepository;
     }
 
+    /**
+     * Saves a photo to the current user's timeline.
+     *
+     * This method associates a specific photo, identified by its ID in the request,
+     * with the authenticated user, and creates a new timeline entry in the database.
+     * If the photo does not exist, an exception is thrown.
+     *
+     * @param currentUser*/
     @PostMapping
     @Transactional
     public ResponseEntity<Void> savePhotoToTimeline(
