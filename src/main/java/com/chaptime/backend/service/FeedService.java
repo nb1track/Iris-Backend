@@ -25,6 +25,18 @@ public class FeedService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Generates a historical feed by processing a list of historical points, searching for
+     * photos that match these historical points, grouping them by place, and returning a
+     * list of PlaceDTO objects with associated photos.
+     *
+     * @param history a list of HistoricalPointDTO objects, each representing a historical
+     *                point with latitude, longitude, and timestamp. This parameter is used
+     *                to find relevant photos from the repository. Must not be null or empty.
+     * @return a list of PlaceDTO objects, where each PlaceDTO represents a place and its
+     *         associated photos. Returns an empty list if the given history is null or empty.
+     * @throws RuntimeException if there is an error during JSON processing of the historical data.
+     */
     @Transactional(readOnly = true)
     public List<PlaceDTO> generateHistoricalFeed(List<HistoricalPointDTO> history) {
         if (history == null || history.isEmpty()) {
