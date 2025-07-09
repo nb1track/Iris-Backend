@@ -56,6 +56,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
 
+        if (request.getServletPath().equals("/api/v1/users/signup")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        logger.info("--- AUTH FILTER --- Request path: {}", request.getServletPath());
+
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String idToken = authHeader.substring(7);
             try {
