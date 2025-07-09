@@ -46,8 +46,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        // Erlaube den Signup-Endpunkt für jeden
+                        // --- DIESE ZEILE IST ENTSCHEIDEND ---
+                        // Erlaube den Signup-Endpunkt für jeden, ohne Authentifizierungs-Prüfung durch den Filter
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/signup").permitAll()
+
                         // Alle anderen Anfragen müssen weiterhin authentifiziert sein
                         .requestMatchers("/api/v1/**").authenticated()
                 )
