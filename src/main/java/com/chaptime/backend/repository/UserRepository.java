@@ -24,11 +24,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByFirebaseUid(String firebaseUid);
 
     @Query(value = """
-
-            SELECT * FROM users u
+    SELECT * FROM users u
     WHERE u.id != :userId
+    AND u.last_location IS NOT NULL -- <-- DIESE ZEILE HINZUFÜGEN
     AND ST_DWithin(
-        u.last_location, -- KORREKTUR: von last_known_location zu last_location
+        u.last_location,
         ST_MakePoint(:longitude, :latitude)::geography,
         :radius
     )
