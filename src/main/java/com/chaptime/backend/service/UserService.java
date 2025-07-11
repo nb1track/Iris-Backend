@@ -1,9 +1,6 @@
 package com.chaptime.backend.service;
 
-import com.chaptime.backend.dto.ExportedFriendshipDTO;
-import com.chaptime.backend.dto.ExportedPhotoDTO;
-import com.chaptime.backend.dto.LocationUpdateRequestDTO;
-import com.chaptime.backend.dto.UserDataExportDTO;
+import com.chaptime.backend.dto.*;
 import com.chaptime.backend.model.Friendship;
 import com.chaptime.backend.model.Photo;
 import com.chaptime.backend.model.User;
@@ -184,18 +181,25 @@ public class UserService {
     }
 
     /**
-     * Retrieves a list of users who are geographically near the specified location,
-     * excluding the user identified by the provided unique identifier.
+     * Finds nearby users within a specified radius of a given location.
      *
-     * @param latitude The latitude coordinate of the location to search nearby users.
-     * @param longitude The longitude coordinate of the location to search nearby users.
-     * @param currentUserId The unique identifier (UUID) of the user to be excluded from the results.
-     * @return A list of {@code User} entities representing users located within a specified radius
-     *         from the given coordinates.
+     * @param latitude       The latitude of the center point for the search.
+     * @param longitude      The longitude of the center point for the search.
+     * @param radiusInMeters The radius in meters to search within.
+     * @param currentUserId  The ID of the user performing the search, to exclude them from results.
+     * @return A list of UserDTOs representing the nearby users.
      */
-    public List<User> getNearbyUsers(double latitude, double longitude, UUID currentUserId) {
-        // Wir definieren einen festen Radius von z.B. 10 Kilometern (10000 Meter)
-        final double SEARCH_RADIUS_METERS = 10000.0;
-        return userRepository.findUsersNearby(latitude, longitude, SEARCH_RADIUS_METERS, currentUserId);
+    @Transactional(readOnly = true)
+    public List<UserDTO> findNearbyUsers(double latitude, double longitude, double radiusInMeters, UUID currentUserId) {
+        List<User> nearbyUsers = userRepository.findUsersNearby(
+                latitude,
+                longitude,
+                radiusInMeters,
+                currentUserId
+        );
+
+        return nearbyUsers.stream()
+                .map(user -> new UserDTO(user.getId(), user.getUsername()))
+                .collect(Collectors.toList());
     }
 }

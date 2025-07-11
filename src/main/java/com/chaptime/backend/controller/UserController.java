@@ -111,21 +111,29 @@ public class UserController {
     }
 
     /**
-     * Retrieves a list of nearby users based on the provided geographic coordinates
-     * and the current user's information.
+     * Finds and returns a list of users near a given geographical location.
+     * The location and search radius are provided as request parameters.
      *
-     * @param latitude the latitude of the location to search from
-     * @param longitude the longitude of the location to search from
-     * @param currentUser the currently authenticated user, extracted from the security context
-     * @return a {@code ResponseEntity} containing a list of nearby {@code User} objects, with status 200 (OK)
+     * @param currentUser    The currently authenticated user, to exclude them from the results.
+     * @param latitude       The latitude of the location to search around.
+     * @param longitude      The longitude of the location to search around.
+     * @param radius         The search radius in meters. Defaults to 5000 meters.
+     * @return A ResponseEntity containing a list of UserDTOs.
      */
     @GetMapping("/nearby")
-    public ResponseEntity<List<User>> getNearbyUsers(
-            @RequestParam double latitude,
-            @RequestParam double longitude,
-            @AuthenticationPrincipal User currentUser) {
+    public ResponseEntity<List<UserDTO>> getNearbyUsers(
+            @AuthenticationPrincipal User currentUser,
+            @RequestParam("latitude") double latitude,
+            @RequestParam("longitude") double longitude,
+            @RequestParam(name = "radius", defaultValue = "5000") double radius) {
 
-        List<User> nearbyUsers = userService.getNearbyUsers(latitude, longitude, currentUser.getId());
+        List<UserDTO> nearbyUsers = userService.findNearbyUsers(
+                latitude,
+                longitude,
+                radius,
+                currentUser.getId() // Wir brauchen den User nur für seine ID
+        );
+
         return ResponseEntity.ok(nearbyUsers);
     }
 }
