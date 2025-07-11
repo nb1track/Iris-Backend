@@ -141,19 +141,27 @@ public class FriendshipService {
         }
         logger.info("--- [sendFriendRequest] Distance check PASSED.");
 
+        User userOne = requester.getId().compareTo(addressee.getId()) < 0 ? requester : addressee;
+        User userTwo = requester.getId().compareTo(addressee.getId()) < 0 ? addressee : requester;
+
+        // Prüfe, ob bereits eine Beziehung existiert
+        if (friendshipRepository.existsByUserOneAndUserTwo(userOne, userTwo)) {
+            logger.warn("--- [sendFriendRequest] Friendship already exists. Aborting.");
+            // Wirf einen Fehler, den der Controller fangen und an die App senden kann
+            throw new IllegalStateException("A friendship or pending request already exists between these users.");
+        }
+        logger.info("--- [sendFriendRequest] No existing friendship found. Proceeding.");
+        // --- ENDE NEUE PRÜFUNG ---
+
         // Neue Freundschaftsanfrage erstellen
         Friendship newFriendship = new Friendship();
-        if (requester.getId().compareTo(addressee.getId()) < 0) {
-            newFriendship.setUserOne(requester);
-            newFriendship.setUserTwo(addressee);
-        } else {
-            newFriendship.setUserOne(addressee);
-            newFriendship.setUserTwo(requester);
-        }
+        newFriendship.setUserOne(userOne);
+        newFriendship.setUserTwo(userTwo);
         newFriendship.setStatus(FriendshipStatus.PENDING);
         newFriendship.setActionUser(requester);
 
         friendshipRepository.save(newFriendship);
+        logger.info("--- [sendFriendRequest] Successfully saved new friend request.");
     }
 
     /**
