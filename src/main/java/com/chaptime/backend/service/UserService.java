@@ -15,6 +15,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.google.firebase.auth.FirebaseToken;
@@ -180,5 +181,21 @@ public class UserService {
         newUser.setUsername(username);
 
         return userRepository.save(newUser);
+    }
+
+    /**
+     * Retrieves a list of users who are geographically near the specified location,
+     * excluding the user identified by the provided unique identifier.
+     *
+     * @param latitude The latitude coordinate of the location to search nearby users.
+     * @param longitude The longitude coordinate of the location to search nearby users.
+     * @param currentUserId The unique identifier (UUID) of the user to be excluded from the results.
+     * @return A list of {@code User} entities representing users located within a specified radius
+     *         from the given coordinates.
+     */
+    public List<User> getNearbyUsers(double latitude, double longitude, UUID currentUserId) {
+        // Wir definieren einen festen Radius von z.B. 10 Kilometern (10000 Meter)
+        final double SEARCH_RADIUS_METERS = 10000.0;
+        return userRepository.findUsersNearby(latitude, longitude, SEARCH_RADIUS_METERS, currentUserId);
     }
 }

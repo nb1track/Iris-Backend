@@ -15,6 +15,8 @@ import com.google.firebase.auth.FirebaseToken;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
+import java.util.List;
+
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -106,5 +108,24 @@ public class UserController {
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(null); // 409 Conflict if user exists
         }
+    }
+
+    /**
+     * Retrieves a list of nearby users based on the provided geographic coordinates
+     * and the current user's information.
+     *
+     * @param latitude the latitude of the location to search from
+     * @param longitude the longitude of the location to search from
+     * @param currentUser the currently authenticated user, extracted from the security context
+     * @return a {@code ResponseEntity} containing a list of nearby {@code User} objects, with status 200 (OK)
+     */
+    @GetMapping("/nearby")
+    public ResponseEntity<List<User>> getNearbyUsers(
+            @RequestParam double latitude,
+            @RequestParam double longitude,
+            @AuthenticationPrincipal User currentUser) {
+
+        List<User> nearbyUsers = userService.getNearbyUsers(latitude, longitude, currentUser.getId());
+        return ResponseEntity.ok(nearbyUsers);
     }
 }
