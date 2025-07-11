@@ -76,7 +76,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     logger.info("--- DATABASE MATCH --- Found user '{}' in DB for UID {}", user.getUsername(), uidFromToken);
 
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            user, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+                            user, null, user.getAuthorities() // Holt sich die Rollen direkt vom User-Objekt
                     );
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 } else {
