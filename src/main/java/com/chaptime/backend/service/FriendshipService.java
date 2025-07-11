@@ -208,14 +208,14 @@ public class FriendshipService {
      */
     @Transactional(readOnly = true)
     public List<PendingRequestDTO> getPendingRequests(User currentUser) {
-        // Finde alle PENDING Anfragen, bei denen der currentUser NICHT der Absender ist.
+        // HIER WERDEN DEINE NEUEN METHODEN JETZT VERWENDET
         List<Friendship> requestsAsUserOne = friendshipRepository
-                .findAllByStatusAndUserOneAndActionUserNot(FriendshipStatus.PENDING, currentUser, currentUser);
+                .findByUserOneAndStatusAndActionUserNot(currentUser, FriendshipStatus.PENDING, currentUser);
 
         List<Friendship> requestsAsUserTwo = friendshipRepository
-                .findAllByStatusAndUserTwoAndActionUserNot(FriendshipStatus.PENDING, currentUser, currentUser);
+                .findByUserTwoAndStatusAndActionUserNot(currentUser, FriendshipStatus.PENDING, currentUser);
 
-        // Kombiniere die Listen und mappe sie auf DTOs
+        // Wir führen beide Listen zusammen und wandeln sie in DTOs um.
         return Stream.concat(requestsAsUserOne.stream(), requestsAsUserTwo.stream())
                 .map(friendship -> new PendingRequestDTO(
                         friendship.getId(),
