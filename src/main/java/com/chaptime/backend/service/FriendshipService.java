@@ -1,6 +1,7 @@
 package com.chaptime.backend.service;
 
 import com.chaptime.backend.dto.FriendshipActionDTO;
+import com.chaptime.backend.dto.PendingRequestDTO;
 import com.chaptime.backend.dto.UserDTO;
 import com.chaptime.backend.model.Friendship;
 import com.chaptime.backend.model.User;
@@ -9,11 +10,14 @@ import com.chaptime.backend.repository.FriendshipRepository;
 import com.chaptime.backend.repository.UserRepository;
 import org.locationtech.jts.geom.Point;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class FriendshipService {
@@ -170,5 +174,30 @@ public class FriendshipService {
         friendship.setStatus(FriendshipStatus.ACCEPTED);
         friendship.setActionUser(acceptor); // Setze den annehmenden User als letzten Akteur
         friendshipRepository.save(friendship);
+    }
+
+    /**
+     * Retrieves a list of pending friend requests for the specified user. The pending
+     * requests are those where the given user is not the sender of the request.
+     *
+     * @param currentUser The user for whom pending requests are to be retrieved.
+     * @return A list of PendingRequestDTO objects representing the pending friend requests.
+     */
+    @Transactional(readOnly = true)
+    public List<PendingRequestDTO> getPendingRequests(User currentUser) {
+        // Finde alle PENDING Anfragen, bei denen der currentUser NICHT der Absender ist.
+        List<Friendship> requestsAsUserOne = friendshipRepository
+                .findAllByStatusAndUserOneAndActionUserNot(FriendshipStatus.PENDING, currentUser, currentUser);
+
+        List<Friendship> requestsAsUserTwo = friendshipRepository
+                .findAllByStatusAndUserTwoAndActionUserNot(FriendshipStatus.PENDING, currentUser, currentUser);
+
+        // Kombiniere die Listen und mappe sie auf DTOs
+        return Stream.concat(requestsAsUserOne.stream(), requestsAsUserTwo.stream())
+                .map(friendship -> new PendingRequestDTO(
+                        friendship.getId(),
+                        friendship.getActionUser().getUsername()
+                ))
+                .collect(Collectors.toList());
     }
 }

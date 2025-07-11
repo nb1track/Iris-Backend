@@ -25,4 +25,7 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
 
     List<Friendship> findByUserOneAndStatusOrUserTwoAndStatus(User userOne, FriendshipStatus statusOne, User userTwo, FriendshipStatus statusTwo);
 
+    // Findet alle Anfragen, bei denen der User nicht der "action user" ist und der Status PENDING ist.
+    List<Friendship> findAllByStatusAndUserTwoAndActionUserNot(FriendshipStatus status, User userTwo, User actionUser);
+    List<Friendship> findAllByStatusAndUserOneAndActionUserNot(FriendshipStatus status, User userOne, User actionUser);
 }

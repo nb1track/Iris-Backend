@@ -2,6 +2,7 @@ package com.chaptime.backend.controller;
 
 import com.chaptime.backend.dto.FriendRequestDTO;
 import com.chaptime.backend.dto.FriendshipActionDTO;
+import com.chaptime.backend.dto.PendingRequestDTO;
 import com.chaptime.backend.dto.UserDTO;
 import com.chaptime.backend.model.User;
 import com.chaptime.backend.service.FriendshipService;
@@ -72,6 +73,17 @@ public class FriendshipController {
         }
     }
 
+    /**
+     * Retrieves a list of pending friend requests for the currently authenticated user.
+     *
+     * @param currentUser the authenticated user for whom the pending requests are being retrieved, extracted from the authentication token
+     * @return a ResponseEntity containing a list of PendingRequestDTO objects representing the user's pending friend requests
+     */
+    @GetMapping("/requests/pending")
+    public ResponseEntity<List<PendingRequestDTO>> getPendingRequests(@AuthenticationPrincipal User currentUser) {
+        List<PendingRequestDTO> requests = friendshipService.getPendingRequests(currentUser);
+        return ResponseEntity.ok(requests);
+    }
     /**
      * Retrieves a list of friends for the currently authenticated user.
      *
