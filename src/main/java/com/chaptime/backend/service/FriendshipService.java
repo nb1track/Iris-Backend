@@ -9,6 +9,8 @@ import com.chaptime.backend.model.enums.FriendshipStatus;
 import com.chaptime.backend.repository.FriendshipRepository;
 import com.chaptime.backend.repository.UserRepository;
 import org.locationtech.jts.geom.Point;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,8 @@ import java.util.stream.Stream;
 
 @Service
 public class FriendshipService {
+
+    private static final Logger logger = LoggerFactory.getLogger(FriendshipService.class);
 
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
@@ -101,30 +105,41 @@ public class FriendshipService {
      * @throws SecurityException if the users are not within the maximum allowed distance
      */
     public void sendFriendRequest(User requester, UUID addresseeId) {
+        logger.info("--- [sendFriendRequest] Starting friend request from {} to {}", requester.getUsername(), addresseeId);
+
         User addressee = userRepository.findById(addresseeId)
                 .orElseThrow(() -> new RuntimeException("Addressee not found"));
+        logger.info("--- [sendFriendRequest] Addressee {} found.", addressee.getUsername());
 
         // Standort-Check
         Point requesterLocation = requester.getLastLocation();
         Point addresseeLocation = addressee.getLastLocation();
 
-        // ... der Rest der Methode bleibt exakt gleich ...
         if (requesterLocation == null || addresseeLocation == null) {
+            logger.error("--- [sendFriendRequest] Location not available for one or both users.");
             throw new IllegalStateException("User location not available.");
         }
+        logger.info("--- [sendFriendRequest] Locations are available for both users.");
 
         // Zeit-Check
         long requesterLocAge = Duration.between(requester.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes();
         long addresseeLocAge = Duration.between(addressee.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes();
+        logger.info("--- [sendFriendRequest] Location age check: Requester {} mins, Addressee {} mins.", requesterLocAge, addresseeLocAge);
+
         if (requesterLocAge > 5 || addresseeLocAge > 5) {
+            logger.warn("--- [sendFriendRequest] Location is outdated for one or both users.");
             throw new IllegalStateException("User location is outdated.");
         }
 
         // Distanz-Check
         double distance = requesterLocation.distance(addresseeLocation);
+        logger.info("--- [sendFriendRequest] Calculated distance is {} meters.", distance);
+
         if (distance > MAX_DISTANCE_METERS) {
+            logger.warn("--- [sendFriendRequest] Distance check FAILED. Distance {} is greater than max {}.", distance, MAX_DISTANCE_METERS);
             throw new SecurityException("Users are not close enough to send a friend request.");
         }
+        logger.info("--- [sendFriendRequest] Distance check PASSED.");
 
         // Neue Freundschaftsanfrage erstellen
         Friendship newFriendship = new Friendship();
