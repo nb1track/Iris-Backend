@@ -50,6 +50,10 @@ public class SecurityConfig {
                         // Erlaube den Signup-Endpunkt für jeden, ohne Authentifizierungs-Prüfung durch den Filter
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/signup").permitAll()
 
+                        // --- NEUE TEST-ZEILE HINZUFÜGEN ---
+                        .requestMatchers(HttpMethod.POST, "/api/v1/feed/historical").permitAll()
+                        // ---------------------------------
+
                         // Alle anderen Anfragen müssen weiterhin authentifiziert sein
                         .requestMatchers("/api/v1/**").authenticated()
                 )
