@@ -43,14 +43,14 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
+                // DIESE BEIDEN ZEILEN SIND ENTSCHEIDEND
+                .httpBasic(httpBasic -> httpBasic.disable())
+                .formLogin(formLogin -> formLogin.disable())
+
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        // --- DIESE ZEILE IST ENTSCHEIDEND ---
-                        // Erlaube den Signup-Endpunkt für jeden, ohne Authentifizierungs-Prüfung durch den Filter
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/signup").permitAll()
-
-                        // Alle anderen Anfragen müssen weiterhin authentifiziert sein
                         .requestMatchers("/api/v1/**").authenticated()
                 )
                 .build();
