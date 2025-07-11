@@ -24,17 +24,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByFirebaseUid(String firebaseUid);
 
     @Query(value = """
-        SELECT * FROM users u
-        WHERE u.id != :userId
-        AND ST_DWithin(
-            u.last_known_location,
-            ST_MakePoint(:longitude, :latitude)::geography,
-            :radius
-        )
-        """, nativeQuery = true)
+
+            SELECT * FROM users u
+    WHERE u.id != :userId
+    AND ST_DWithin(
+        u.last_location, -- KORREKTUR: von last_known_location zu last_location
+        ST_MakePoint(:longitude, :latitude)::geography,
+        :radius
+    )
+    """, nativeQuery = true)
     List<User> findUsersNearby(
             @Param("latitude") double latitude,
             @Param("longitude") double longitude,
             @Param("radius") double radius,
             @Param("userId") UUID userId);
-}
+    }
