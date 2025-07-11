@@ -13,7 +13,7 @@ public class ChaptimeBackend1Application {
 
     public static void main(String[] args) {
         // --- LOG-MELDUNG HINZUFÜGEN ---
-        logger.info("<<<<<<<<< DEPLOYMENT TEST v3.02 - ANWENDUNG STARTET >>>>>>>>>");
+        logger.info("<<<<<<<<< DEPLOYMENT TEST v3.03 - ANWENDUNG STARTET >>>>>>>>>");
         SpringApplication.run(ChaptimeBackend1Application.class, args);
     }
 }

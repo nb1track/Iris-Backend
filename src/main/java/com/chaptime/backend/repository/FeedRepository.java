@@ -10,19 +10,20 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-// JpaRepository<Photo, UUID> weil das primäre Ergebnis Fotos sind
 public interface FeedRepository extends JpaRepository<Photo, UUID> {
 
     @Query(value = """
         SELECT DISTINCT ph.*
         FROM
             photos ph,
-            jsonb_to_recordset(:historyJson::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
+            -- Wir benutzen jetzt einen index-basierten Parameter '?1'
+            jsonb_to_recordset(?1::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
         WHERE
             ph.visibility = 'PUBLIC'
-            AND ST_DWithin(ph.location, ST_MakePoint(h.longitude, h.latitude)::geography, 500) -- 500m Radius
+            AND ST_DWithin(ph.location, ST_MakePoint(h.longitude, h.latitude)::geography, 500)
             AND ph.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
         ORDER BY ph.uploaded_at DESC
         """, nativeQuery = true)
+        // Die Signatur der Methode bleibt gleich, Spring Data ordnet ?1 automatisch dem ersten Parameter zu.
     List<Photo> findPhotosMatchingHistoricalBatch(@Param("historyJson") String historyJson);
 }
