@@ -127,11 +127,14 @@ public class UserController {
             @RequestParam("longitude") double longitude,
             @RequestParam(name = "radius", defaultValue = "5000") double radius) {
 
-        List<UserDTO> nearbyUsers = userService.findNearbyUsers(
+        // --- HIER IST DIE KORREKTUR ---
+        // Der Methodenaufruf muss in einer Zeile mit den richtigen Parametern erfolgen.
+        // Deine neue Methode im UserService erwartet den ganzen `currentUser`.
+        List<UserDTO> nearbyUsers = userService.getNearbyUsers(
                 latitude,
                 longitude,
                 radius,
-                currentUser.getId() // Wir brauchen den User nur für seine ID
+                currentUser
         );
 
         return ResponseEntity.ok(nearbyUsers);

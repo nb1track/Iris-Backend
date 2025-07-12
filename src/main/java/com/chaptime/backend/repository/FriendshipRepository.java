@@ -18,6 +18,9 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
     List<Friendship> findByUserOneAndStatusAndActionUserNot(User userOne, FriendshipStatus status, User actionUser);
     List<Friendship> findByUserTwoAndStatusAndActionUserNot(User userTwo, FriendshipStatus status, User actionUser);
 
+    // Findet alle Freundschafts-Beziehungen für einen bestimmten User
+    List<Friendship> findByUserOneOrUserTwo(User userOne, User userTwo);
+
     // Diese Methode hattest du schon, um doppelte Anfragen zu verhindern
     boolean existsByUserOneAndUserTwo(User userOne, User userTwo);
 }

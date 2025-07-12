@@ -8,16 +8,18 @@ import com.chaptime.backend.model.enums.FriendshipStatus;
 import com.chaptime.backend.repository.FriendshipRepository;
 import com.chaptime.backend.repository.PhotoRepository;
 import com.chaptime.backend.repository.UserRepository;
+import com.google.firebase.auth.FirebaseToken;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.google.firebase.auth.FirebaseToken;
+
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -30,63 +32,30 @@ public class UserService {
     private final GcsStorageService gcsStorageService;
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
-    /**
-     * Constructs a new instance of {@code UserService}.
-     *
-     * @param userRepository A data repository for {@code User} entities, used to
-     *                       manage user-related database operations.
-     * @param photoRepository A data repository for {@code Photo} entities, used to
-     *                        manage operations related to user-uploaded photos.
-     * @param friendshipRepository A data repository for {@code Friendship} entities,
-     *                              used to handle user friendship data and relationships.
-     * @param gcsStorageService A service for interacting with Google Cloud Storage (GCS),
-     *                          used to manage the storage and retrieval of user-uploaded resources.
-     */
     public UserService(UserRepository userRepository, PhotoRepository photoRepository, FriendshipRepository friendshipRepository, GcsStorageService gcsStorageService) {
         this.userRepository = userRepository;
         this.photoRepository = photoRepository;
         this.friendshipRepository = friendshipRepository;
-        this.gcsStorageService = gcsStorageService; // Hinzufügen
+        this.gcsStorageService = gcsStorageService;
     }
 
-    /**
-     * Updates the location of a user in the system with new geographical coordinates.
-     * This method retrieves the user from the database by their unique identifier,
-     * creates a new geometry point from the provided coordinates, and updates the
-     * user's location and timestamp.
-     *
-     * @param userId The unique identifier (UUID) of the user whose location is being updated.
-     * @param locationUpdate A {@code LocationUpdateRequestDTO} containing the new latitude and
-     *                       longitude coordinates for the user's location.
-     */
+    @Transactional
     public void updateUserLocation(UUID userId, LocationUpdateRequestDTO locationUpdate) {
-        // 1. Finde den Benutzer in der Datenbank
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
 
-        // 2. Erstelle einen Geometrie-Punkt aus den neuen Koordinaten
         Point newLocation = geometryFactory.createPoint(new Coordinate(locationUpdate.longitude(), locationUpdate.latitude()));
 
-        // 3. Aktualisiere die Felder und speichere den Benutzer
         user.setLastLocation(newLocation);
         user.setLastLocationUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
     }
 
-    /**
-     * Exports user data into a unified data transfer object (DTO).
-     * This includes user's profile information, photos, and accepted friendships.
-     *
-     * @param userId The unique identifier (UUID) of the user whose data is being exported.
-     * @return A {@code UserDataExportDTO} containing the user's ID, username, email,
-     *         uploaded photos, and accepted friendships.
-     */
+    @Transactional(readOnly = true)
     public UserDataExportDTO exportUserData(UUID userId) {
-        // 1. User-Profil holen
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // 2. Alle Fotos des Users holen
         List<Photo> photos = photoRepository.findAllByUploader(user);
         List<ExportedPhotoDTO> photoDTOs = photos.stream()
                 .map(p -> new ExportedPhotoDTO(
@@ -94,12 +63,11 @@ public class UserService {
                         p.getStorageUrl(),
                         p.getVisibility(),
                         p.getUploadedAt(),
-                        p.getLocation().getY(), // Latitude ist Y
-                        p.getLocation().getX()  // Longitude ist X
+                        p.getLocation().getY(),
+                        p.getLocation().getX()
                 ))
                 .collect(Collectors.toList());
 
-        // 3. Alle Freunde des Users holen
         List<Friendship> friendships = friendshipRepository
                 .findByUserOneAndStatusOrUserTwoAndStatus(user, FriendshipStatus.ACCEPTED, user, FriendshipStatus.ACCEPTED);
         List<ExportedFriendshipDTO> friendDTOs = friendships.stream()
@@ -109,7 +77,6 @@ public class UserService {
                 })
                 .collect(Collectors.toList());
 
-        // 4. Alles zu einem grossen DTO zusammenbauen
         return new UserDataExportDTO(
                 user.getId(),
                 user.getUsername(),
@@ -119,86 +86,67 @@ public class UserService {
         );
     }
 
-    /**
-     * Deletes a user account and all associated resources from the system.
-     * This includes:
-     * - Removing the user entity from the database.
-     * - Deleting all photos uploaded by the user from storage.
-     * - Automatically removing related database entries, such as friendships,
-     *   using "ON DELETE CASCADE".
-     *
-     * Note: User data is also planned to be removed from Firebase Authentication
-     * in a future step.
-     *
-     * @param userId The unique identifier (UUID) of the user to be deleted.
-     */
     @Transactional
     public void deleteUserAccount(UUID userId) {
-        // 1. Finde den User, um sicherzustellen, dass er existiert
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // 2. Finde alle Fotos des Users, um sie aus dem Storage zu löschen
         List<Photo> photosToDelete = photoRepository.findAllByUploader(user);
         for (Photo photo : photosToDelete) {
             gcsStorageService.deleteFile(photo.getStorageUrl());
         }
-
-        // 3. Lösche den User aus der Datenbank.
-        // Dank "ON DELETE CASCADE" werden alle verknüpften Fotos, Freundschaften etc.
-        // automatisch mitgelöscht.
         userRepository.delete(user);
-
-        // 4. Späterer Schritt: Lösche den User aus Firebase Auth
     }
 
-    /**
-     * Registers a new user in the system based on a provided Firebase token and username.
-     * The method checks if a user with the same Firebase UID already exists in the database.
-     * If a user with the given UID is found, an {@code IllegalStateException} is thrown.
-     * Otherwise, a new {@code User} entity is created using the Firebase token details and
-     * the specified username, which is then saved in the database.
-     *
-     * @param decodedToken A {@code FirebaseToken} object containing the Firebase user's
-     *                     authentication details, such as UID and email.
-     * @param username     The desired username for the new user.
-     * @return The newly created {@code User} entity after being saved in the database.
-     * @throws IllegalStateException If a user with the same Firebase UID already exists in the database.
-     */
     public User registerNewUser(FirebaseToken decodedToken, String username) {
-        // Prüfen, ob der User oder der Username bereits existiert
         if (userRepository.findByFirebaseUid(decodedToken.getUid()).isPresent()) {
             throw new IllegalStateException("User already exists in our database.");
         }
-        // Hier könntest du auch prüfen, ob der Username schon vergeben ist
-
         User newUser = new User();
         newUser.setFirebaseUid(decodedToken.getUid());
         newUser.setEmail(decodedToken.getEmail());
         newUser.setUsername(username);
-
         return userRepository.save(newUser);
     }
 
     /**
-     * Finds nearby users within a specified radius of a given location.
-     *
-     * @param latitude       The latitude of the center point for the search.
-     * @param longitude      The longitude of the center point for the search.
-     * @param radiusInMeters The radius in meters to search within.
-     * @param currentUserId  The ID of the user performing the search, to exclude them from results.
-     * @return A list of UserDTOs representing the nearby users.
+     * Finds nearby users who are not already friends, have no pending requests,
+     * and have an up-to-date location.
      */
     @Transactional(readOnly = true)
-    public List<UserDTO> findNearbyUsers(double latitude, double longitude, double radiusInMeters, UUID currentUserId) {
-        List<User> nearbyUsers = userRepository.findUsersNearby(
+    public List<UserDTO> getNearbyUsers(double latitude, double longitude, double radiusInMeters, User currentUser) {
+        // 1. Hole alle Benutzer im Radius, außer dem aktuellen User
+        List<User> usersInRadius = userRepository.findUsersNearby(
                 latitude,
                 longitude,
                 radiusInMeters,
-                currentUserId
+                currentUser.getId()
         );
 
-        return nearbyUsers.stream()
+        // 2. Hole alle IDs von Benutzern, mit denen bereits eine Beziehung besteht (Freunde oder offen)
+        Set<UUID> existingRelationsIds = friendshipRepository.findByUserOneOrUserTwo(currentUser, currentUser)
+                .stream()
+                .map(friendship -> friendship.getUserOne().getId().equals(currentUser.getId())
+                        ? friendship.getUserTwo().getId()
+                        : friendship.getUserOne().getId())
+                .collect(Collectors.toSet());
+
+        // 3. Filtere die Liste nach den gewünschten Kriterien
+        List<User> filteredUsers = usersInRadius.stream()
+                .filter(user -> {
+                    // Bedingung A: Standort darf nicht veraltet sein (null-check + Zeit)
+                    boolean isLocationRecent = user.getLastLocationUpdatedAt() != null &&
+                            Duration.between(user.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes() <= 5;
+
+                    // Bedingung B: Es darf keine bestehende Beziehung geben
+                    boolean noExistingRelation = !existingRelationsIds.contains(user.getId());
+
+                    return isLocationRecent && noExistingRelation;
+                })
+                .collect(Collectors.toList());
+
+        // 4. Wandle das Ergebnis in DTOs um und gib es zurück
+        return filteredUsers.stream()
                 .map(user -> new UserDTO(user.getId(), user.getUsername()))
                 .collect(Collectors.toList());
     }
