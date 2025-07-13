@@ -6,6 +6,10 @@ import com.chaptime.backend.model.TimelineEntry;
 import com.chaptime.backend.model.User;
 import com.chaptime.backend.repository.PhotoRepository;
 import com.chaptime.backend.repository.TimelineEntryRepository;
+import com.chaptime.backend.dto.PhotoResponseDTO;
+import com.chaptime.backend.service.TimelineService;
+import org.springframework.web.bind.annotation.GetMapping;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,11 +20,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/timeline/entries")
+@RequestMapping("/api/v1/timeline")
 public class TimelineController {
 
     private final TimelineEntryRepository timelineEntryRepository;
     private final PhotoRepository photoRepository;
+    private final TimelineService timelineService;
 
     /**
      * Constructs a new TimelineController with the specified dependencies.
@@ -28,9 +33,10 @@ public class TimelineController {
      * @param timelineEntryRepository the repository responsible for managing TimelineEntry entities
      * @param photoRepository the repository responsible for managing Photo entities
      */
-    public TimelineController(TimelineEntryRepository timelineEntryRepository, PhotoRepository photoRepository) {
+    public TimelineController(TimelineEntryRepository timelineEntryRepository, PhotoRepository photoRepository, TimelineService timelineService) {
         this.timelineEntryRepository = timelineEntryRepository;
         this.photoRepository = photoRepository;
+        this.timelineService = timelineService;
     }
 
     /**
@@ -41,7 +47,7 @@ public class TimelineController {
      * If the photo does not exist, an exception is thrown.
      *
      * @param currentUser*/
-    @PostMapping
+    @PostMapping("/entries")
     @Transactional
     public ResponseEntity<Void> savePhotoToTimeline(
             @AuthenticationPrincipal User currentUser,
@@ -58,5 +64,18 @@ public class TimelineController {
         timelineEntryRepository.save(newEntry);
 
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    /**
+     * Retrieves the timeline for the currently authenticated user.
+     * The timeline consists of a list of photos associated with the user.
+     *
+     * @param currentUser the currently authenticated user whose timeline needs to be retrieved
+     * @return a ResponseEntity containing a list of PhotoResponseDTO objects representing the photos in the user's timeline
+     */
+    @GetMapping
+    public ResponseEntity<List<PhotoResponseDTO>> getTimeline(@AuthenticationPrincipal User currentUser) {
+        List<PhotoResponseDTO> timelinePhotos = timelineService.getTimelineForUser(currentUser);
+        return ResponseEntity.ok(timelinePhotos);
     }
 }
