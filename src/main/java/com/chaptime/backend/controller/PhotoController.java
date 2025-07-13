@@ -70,7 +70,8 @@ public class PhotoController {
                 metadata.longitude(),
                 metadata.visibility(),
                 metadata.placeId(),
-                uploader // <-- Den authentifizierten User übergeben
+                uploader, // <-- Den authentifizierten User übergeben
+                metadata.friendIds()
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(new PhotoUploadResponse(newPhotoId));

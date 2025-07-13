@@ -1,7 +1,10 @@
 package com.chaptime.backend.repository;
 
 import com.chaptime.backend.model.Friendship;
+import org.locationtech.jts.geom.Point;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import com.chaptime.backend.model.User;
 import com.chaptime.backend.model.enums.FriendshipStatus;
@@ -23,4 +26,7 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
 
     // Diese Methode hattest du schon, um doppelte Anfragen zu verhindern
     boolean existsByUserOneAndUserTwo(User userOne, User userTwo);
+
+    @Query("SELECT u FROM User u WHERE u.id IN :friendIds AND ST_DWithin(u.lastLocation, :placeLocation, :radiusInMeters) = true")
+    List<User> findFriendsByIdsWithinRadius(@Param("friendIds") List<UUID> friendIds, @Param("placeLocation") Point placeLocation, @Param("radiusInMeters") double radiusInMeters);
 }

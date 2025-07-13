@@ -4,7 +4,9 @@ import com.chaptime.backend.dto.FriendRequestDTO;
 import com.chaptime.backend.dto.FriendshipActionDTO;
 import com.chaptime.backend.dto.PendingRequestDTO;
 import com.chaptime.backend.dto.UserDTO;
+import com.chaptime.backend.model.Place;
 import com.chaptime.backend.model.User;
+import com.chaptime.backend.repository.PlaceRepository;
 import com.chaptime.backend.service.FriendshipService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,14 +19,16 @@ import org.springframework.http.HttpStatus;
 public class FriendshipController {
 
     private final FriendshipService friendshipService;
+    private final PlaceRepository placeRepository;
 
     /**
      * Constructor for FriendshipController.
      *
      * @param friendshipService the service used to handle friendship-related operations
      */
-    public FriendshipController(FriendshipService friendshipService) {
+    public FriendshipController(FriendshipService friendshipService, PlaceRepository placeRepository) {
         this.friendshipService = friendshipService;
+        this.placeRepository = placeRepository;
     }
 
     /**
@@ -102,5 +106,29 @@ public class FriendshipController {
         // Wir benutzen die ID des angemeldeten Users
         List<UserDTO> friends = friendshipService.getFriendsAsDTO(user.getId());
         return ResponseEntity.ok(friends);
+    }
+
+    /**
+     * Retrieves a list of friends of the authenticated user who are near a specified place.
+     *
+     * This method finds the specified place by its ID, then fetches and returns
+     * a list of friends that are geographically close to that place.
+     *
+     * @param currentUser the authenticated user making the request
+     * @param placeId the unique identifier of the place to search for nearby friends
+     * @return a ResponseEntity containing a list of UserDTO objects that represent the nearby friends
+     */
+    @GetMapping("/at-place")
+    public ResponseEntity<List<UserDTO>> getFriendsAtPlace(
+            @AuthenticationPrincipal User currentUser,
+            @RequestParam Long placeId) {
+
+        // Finde den Ort anhand der ID
+        Place place = placeRepository.findById(placeId)
+                .orElseThrow(() -> new RuntimeException("Place not found"));
+
+        // Finde die nahen Freunde an diesem Ort
+        List<UserDTO> nearbyFriends = friendshipService.findNearbyFriendsAtPlace(currentUser, place.getLocation());
+        return ResponseEntity.ok(nearbyFriends);
     }
 }

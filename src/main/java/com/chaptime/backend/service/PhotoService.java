@@ -4,10 +4,13 @@ import com.chaptime.backend.dto.HistoricalPointDTO;
 import com.chaptime.backend.dto.PhotoResponseDTO;
 import com.chaptime.backend.model.Photo;
 import com.chaptime.backend.model.Place;
+import com.chaptime.backend.model.TimelineEntry;
 import com.chaptime.backend.model.User;
 import com.chaptime.backend.model.enums.PhotoVisibility;
 import com.chaptime.backend.repository.PhotoRepository;
 import com.chaptime.backend.repository.PlaceRepository;
+import com.chaptime.backend.repository.TimelineEntryRepository;
+import com.chaptime.backend.repository.UserRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.locationtech.jts.geom.Coordinate;
@@ -34,7 +37,8 @@ public class PhotoService {
     private final FriendshipService friendshipService;
     private final GoogleApiService googleApiService;
     private final GcsStorageService gcsStorageService;
-
+    private final UserRepository userRepository;
+    private final TimelineEntryRepository timelineEntryRepository;
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
     /**
@@ -46,47 +50,49 @@ public class PhotoService {
      * @param googleApiService the service for interacting with Google APIs
      * @param gcsStorageService the service for handling file storage operations in Google Cloud Storage
      */
-    public PhotoService(PhotoRepository photoRepository, PlaceRepository placeRepository, FriendshipService friendshipService, GoogleApiService googleApiService, GcsStorageService gcsStorageService, ObjectMapper objectMapper) {
+    public PhotoService(PhotoRepository photoRepository, PlaceRepository placeRepository, FriendshipService friendshipService, GoogleApiService googleApiService, GcsStorageService gcsStorageService, ObjectMapper objectMapper, UserRepository userRepository, TimelineEntryRepository timelineEntryRepository) {
         this.photoRepository = photoRepository;
         this.placeRepository = placeRepository;
         this.friendshipService = friendshipService;
         this.googleApiService = googleApiService;
         this.gcsStorageService = gcsStorageService;
         this.objectMapper = objectMapper;
+        this.userRepository = userRepository;
+        this.timelineEntryRepository = timelineEntryRepository;
     }
 
     /**
-     * Creates and saves a new photo in the system.
+     * Creates a new photo, uploads the file to storage, associates it with a place,
+     * user, visibility, and location, and optionally shares it with designated friends.
      *
-     * @param file the photo file to be uploaded
-     * @param latitude the latitude of the photo's location
-     * @param longitude the longitude of the photo's location
-     * @param visibility the visibility level of the photo (e.g., PUBLIC or FRIENDS)
-     * @param placeId the ID of the place associated with the photo
-     * @param user the user uploading the photo
-     * @return the unique identifier of the newly created photo
-     * @throws RuntimeException if the place is not found, the file upload fails, or other errors occur during processing
+     * @param file       The photo file to be uploaded.
+     * @param latitude   The latitude coordinate of the photo's location.
+     * @param longitude  The longitude coordinate of the photo's location.
+     * @param visibility The visibility level of the photo (PUBLIC, PRIVATE, or FRIENDS).
+     * @param placeId    The ID of the place associated with the photo.
+     * @param uploader   The user who is uploading the photo.
+     * @param friendIds  A list of friend IDs with whom the photo is optionally shared
+     *                   when visibility is set to FRIENDS.
+     * @return The unique identifier (UUID) of the newly created photo.
+     * @throws RuntimeException If the place cannot be found, if the file upload fails,
+     *                          or other processing errors occur.
      */
     @Transactional
-    public UUID createPhoto(MultipartFile file, double latitude, double longitude, PhotoVisibility visibility, Long placeId, User user) {
+    public UUID createPhoto(MultipartFile file, double latitude, double longitude, PhotoVisibility visibility, Long placeId, User uploader, List<UUID> friendIds) {
         try {
-            // 1. Finde den vom User ausgewählten Ort in unserer Datenbank
             Place selectedPlace = placeRepository.findById(placeId)
                     .orElseThrow(() -> new RuntimeException("Place with ID " + placeId + " not found."));
 
-            // 2. Bild-URL und Geo-Punkt erstellen
             String fileUrl = gcsStorageService.uploadFile(file);
             Point location = geometryFactory.createPoint(new Coordinate(longitude, latitude));
 
-            // 3. Photo-Objekt erstellen und befüllen
             Photo newPhoto = new Photo();
             newPhoto.setPlace(selectedPlace);
-            newPhoto.setUploader(user);
+            newPhoto.setUploader(uploader);
             newPhoto.setLocation(location);
             newPhoto.setVisibility(visibility);
             newPhoto.setStorageUrl(fileUrl);
 
-            // 4. Ablaufdatum berechnen
             OffsetDateTime now = OffsetDateTime.now();
             newPhoto.setUploadedAt(now);
             if (visibility == PhotoVisibility.PUBLIC) {
@@ -95,12 +101,20 @@ public class PhotoService {
                 newPhoto.setExpiresAt(now.plusDays(7));
             }
 
-            // 5. Foto in der Datenbank speichern
             Photo savedPhoto = photoRepository.save(newPhoto);
+
+            if (visibility == PhotoVisibility.FRIENDS && friendIds != null && !friendIds.isEmpty()) {
+                List<User> targetFriends = userRepository.findAllById(friendIds);
+                for (User friend : targetFriends) {
+                    TimelineEntry newEntry = new TimelineEntry();
+                    newEntry.setUser(friend);
+                    newEntry.setPhoto(savedPhoto);
+                    timelineEntryRepository.save(newEntry);
+                }
+            }
 
             return savedPhoto.getId();
         } catch (IOException e) {
-            // Im Fehlerfall eine Exception werfen
             throw new RuntimeException("Could not upload file: " + e.getMessage());
         }
     }

@@ -3,6 +3,9 @@ package com.chaptime.backend.dto;
 import com.chaptime.backend.model.enums.PhotoVisibility;
 import jakarta.validation.constraints.NotNull;
 
+import java.util.List;
+import java.util.UUID;
+
 /**
  * Represents a data transfer object (DTO) for a photo upload request.
  *
@@ -23,5 +26,6 @@ public record PhotoUploadRequest(
         @NotNull Double latitude, // Die genauen Koordinaten des Fotos
         @NotNull Double longitude,
         @NotNull PhotoVisibility visibility,
-        @NotNull Long placeId// Unsere interne ID für den ausgewählten Ort
+        @NotNull Long placeId,// Unsere interne ID für den ausgewählten Ort
+        List<UUID>friendIds
 ) {}
