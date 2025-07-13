@@ -257,7 +257,7 @@ public class FriendshipService {
         double radius = 100.0; // 100 Meter
 
         // 3. Finde Freunde innerhalb des Radius
-        List<User> nearbyFriends = friendshipRepository.findFriendsByIdsWithinRadius(friendIds, placeLocation, radius);
+        List<User> nearbyFriends = userRepository.findFriendsByIdsWithinRadius(friendIds, placeLocation, radius);
 
         // 4. Filtere zusätzlich nach der Zeit
         return nearbyFriends.stream()

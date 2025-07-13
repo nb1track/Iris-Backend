@@ -26,8 +26,4 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
 
     // Diese Methode hattest du schon, um doppelte Anfragen zu verhindern
     boolean existsByUserOneAndUserTwo(User userOne, User userTwo);
-
-    // Wir entfernen das Alias "u" und passen die Spaltenreferenz an
-    @Query(value = "SELECT * FROM users WHERE id IN (:friendIds) AND ST_DWithin(last_location, :placeLocation, :radiusInMeters)", nativeQuery = true)
-    List<User> findFriendsByIdsWithinRadius(@Param("friendIds") List<UUID> friendIds, @Param("placeLocation") Point placeLocation, @Param("radiusInMeters") double radiusInMeters);
 }
