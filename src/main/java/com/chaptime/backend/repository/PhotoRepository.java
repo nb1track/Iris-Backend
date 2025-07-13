@@ -33,7 +33,7 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
     SELECT DISTINCT ph.*
     FROM
         photos ph,
-        jsonb_to_recordset(:historyJson::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
+        jsonb_to_recordset(cast(:historyJson as jsonb)) AS h(latitude float, longitude float, "timestamp" timestamptz)
     WHERE
         ph.place_id = :placeId
         AND ph.visibility = 'PUBLIC'
