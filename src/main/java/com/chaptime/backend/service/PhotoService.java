@@ -17,6 +17,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -50,15 +51,24 @@ public class PhotoService {
      * @param googleApiService the service for interacting with Google APIs
      * @param gcsStorageService the service for handling file storage operations in Google Cloud Storage
      */
-    public PhotoService(PhotoRepository photoRepository, PlaceRepository placeRepository, FriendshipService friendshipService, GoogleApiService googleApiService, GcsStorageService gcsStorageService, ObjectMapper objectMapper, UserRepository userRepository, TimelineEntryRepository timelineEntryRepository) {
+    public PhotoService(
+            ObjectMapper objectMapper,
+            PhotoRepository photoRepository,
+            PlaceRepository placeRepository,
+            GcsStorageService gcsStorageService,
+            UserRepository userRepository,
+            TimelineEntryRepository timelineEntryRepository,
+            @Lazy FriendshipService friendshipService,
+            GoogleApiService googleApiService
+    ) {
+        this.objectMapper = objectMapper;
         this.photoRepository = photoRepository;
         this.placeRepository = placeRepository;
-        this.friendshipService = friendshipService;
-        this.googleApiService = googleApiService;
         this.gcsStorageService = gcsStorageService;
-        this.objectMapper = objectMapper;
         this.userRepository = userRepository;
         this.timelineEntryRepository = timelineEntryRepository;
+        this.friendshipService = friendshipService;
+        this.googleApiService = googleApiService;
     }
 
     /**
