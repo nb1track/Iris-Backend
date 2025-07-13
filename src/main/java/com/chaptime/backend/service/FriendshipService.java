@@ -236,24 +236,26 @@ public class FriendshipService {
      */
     @Transactional(readOnly = true)
     public List<UserDTO> findNearbyFriendsAtPlace(User currentUser, Point placeLocation) {
-        // 1. Hole die IDs aller akzeptierten Freunde des aktuellen Benutzers
+        // 1. Hole die IDs aller akzeptierten Freunde
         List<UUID> friendIds = getFriendsAsEntities(currentUser.getId()).stream()
                 .map(User::getId)
                 .collect(Collectors.toList());
 
         if (friendIds.isEmpty()) {
-            return List.of(); // Wenn keine Freunde, dann auch keine nahen Freunde
+            return List.of();
         }
 
-        // 2. Definiere einen kleinen Radius für "am gleichen Ort" (z.B. 100 Meter)
+        // 2. Definiere den Radius
         double radius = 100.0;
 
-        // 3. Finde die Freunde, die innerhalb des Radius sind
+        // 3. Finde Freunde innerhalb des Radius
         List<User> nearbyFriends = friendshipRepository.findFriendsByIdsWithinRadius(friendIds, placeLocation, radius);
 
         // 4. Filtere zusätzlich nach der Zeit und wandle in DTOs um
         return nearbyFriends.stream()
-                .filter(friend -> Duration.between(friend.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes() <= 5)
+                // Prüfe zuerst, ob der Zeitstempel nicht null ist, BEVOR du ihn verwendest
+                .filter(friend -> friend.getLastLocationUpdatedAt() != null &&
+                        Duration.between(friend.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes() <= 5)
                 .map(friend -> new UserDTO(friend.getId(), friend.getUsername()))
                 .collect(Collectors.toList());
     }
