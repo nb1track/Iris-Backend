@@ -40,41 +40,54 @@ public class GoogleApiService {
     public List<PlaceDTO> findNearbyPlaces(double latitude, double longitude) {
         Map<String, PlaceDTO> placesMap = new LinkedHashMap<>();
         LatLng coords = new LatLng(latitude, longitude);
+        PlaceDTO preciseAddressDto = null;
+        String preciseStreetName = "";
 
-        // STUFE 1: Exakte Adresse per Reverse Geocoding holen
+        // --- STUFE 1: Exakte Adresse holen ---
         try {
             GeocodingResult[] geocodingResults = GeocodingApi.reverseGeocode(geoApiContext, coords).await();
-            findBestGeocodingResult(geocodingResults)
-                    .ifPresent(bestResult -> {
-                        PlaceDTO precisePlace = saveOrUpdatePlace(bestResult, coords);
-                        placesMap.put(precisePlace.googlePlaceId(), precisePlace);
-                    });
+            Optional<GeocodingResult> bestAddress = findBestGeocodingResult(geocodingResults);
+
+            if (bestAddress.isPresent()) {
+                preciseAddressDto = saveOrUpdatePlace(bestAddress.get(), coords);
+                placesMap.put(preciseAddressDto.googlePlaceId(), preciseAddressDto);
+                // Extrahiere den reinen Strassennamen für den späteren Vergleich
+                preciseStreetName = getStreetNameFromAddress(preciseAddressDto.name());
+                logger.info("Found precise address via Geocoding: {}. Using street name for filtering: {}", preciseAddressDto.name(), preciseStreetName);
+            }
         } catch (Exception e) {
             logger.error("Error calling Google Geocoding API: {}", e.getMessage());
         }
 
-        // STUFE 2: POIs in der Nähe holen
+        // --- STUFE 2: POIs in der Nähe holen ---
         try {
             PlacesSearchResponse placesResponse = PlacesApi.nearbySearchQuery(geoApiContext, coords)
-                    .radius(25).rankby(RankBy.PROMINENCE).await();
+                    .radius(50).rankby(RankBy.PROMINENCE).await();
+
+            final String finalPreciseStreetName = preciseStreetName;
 
             Arrays.stream(placesResponse.results)
                     .map(this::saveOrUpdatePlaceFromPoi)
-                    // Füge nur hinzu, wenn die Google Place ID noch nicht existiert
-                    .forEach(placeDto -> placesMap.putIfAbsent(placeDto.googlePlaceId(), placeDto));
+                    // --- NEUE, STRENGERE FILTERLOGIK ---
+                    .filter(poiDto -> {
+                        boolean isAlreadyPresent = placesMap.containsKey(poiDto.googlePlaceId());
+                        // Verwerfe den POI, wenn der Name den exakten Strassennamen enthält
+                        boolean isSimilarAddress = !finalPreciseStreetName.isEmpty() && poiDto.name().contains(finalPreciseStreetName);
+                        if (isSimilarAddress) {
+                            logger.info("Filtering out similar POI '{}' because it contains street name '{}'", poiDto.name(), finalPreciseStreetName);
+                        }
+                        return !isAlreadyPresent && !isSimilarAddress;
+                    })
+                    .forEach(placeDto -> placesMap.put(placeDto.googlePlaceId(), placeDto));
 
         } catch (Exception e) {
             logger.error("Error calling Google Places API: {}", e.getMessage());
         }
 
-        // Finale De-Duplizierung basierend auf dem Namen, um Fälle wie "Bierhübeli" (doppelt) zu behandeln
-        // Wir behalten die Reihenfolge bei (Geocoding-Ergebnis zuerst)
-        return new ArrayList<>(placesMap.values().stream()
-                .collect(Collectors.toMap(PlaceDTO::name, Function.identity(), (e1, e2) -> e1, LinkedHashMap::new))
-                .values());
+        return new ArrayList<>(placesMap.values());
     }
 
-    // --- Private Helper-Methoden (unverändert) ---
+    // --- Private Helper-Methoden ---
 
     private Optional<GeocodingResult> findBestGeocodingResult(GeocodingResult[] results) {
         if (results == null || results.length == 0) return Optional.empty();
@@ -120,5 +133,12 @@ public class GoogleApiService {
     private String cleanAddressName(String fullAddress) {
         if (fullAddress == null) return null;
         return fullAddress.split(",")[0];
+    }
+
+    // Neue Helper-Methode, um den reinen Strassennamen ohne Nummer zu extrahieren
+    private String getStreetNameFromAddress(String address) {
+        if (address == null || address.isEmpty()) return "";
+        // Entfernt Zahlen und alles was danach kommt
+        return address.replaceAll("\\d+.*", "").trim();
     }
 }
