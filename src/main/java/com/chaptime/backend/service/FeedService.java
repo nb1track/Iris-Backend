@@ -61,7 +61,7 @@ public class FeedService {
         } else if (nearbyPlacesSample.size() > 2) {
             adaptiveRadius = 100; // Vorort/Kleinstadt: 100m Radius
         } else {
-            adaptiveRadius = 200; // Ländlich: 200m Radius
+            adaptiveRadius = 300; // Ländlich: 300m Radius
         }
         System.out.println("ADAPTIVE RADIUS SET TO: " + adaptiveRadius + "m based on " + nearbyPlacesSample.size() + " nearby places.");
         // --- ENDE NEUE LOGIK ---

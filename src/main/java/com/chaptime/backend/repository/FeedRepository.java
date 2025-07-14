@@ -3,10 +3,10 @@ package com.chaptime.backend.repository;
 import com.chaptime.backend.model.Photo;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param; // Importieren
 import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.data.repository.query.Param;
 
 @Repository
 public interface FeedRepository extends JpaRepository<Photo, UUID> {
