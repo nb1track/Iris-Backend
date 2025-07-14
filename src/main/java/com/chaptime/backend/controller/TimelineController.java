@@ -18,6 +18,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/timeline")
@@ -77,5 +80,24 @@ public class TimelineController {
     public ResponseEntity<List<PhotoResponseDTO>> getTimeline(@AuthenticationPrincipal User currentUser) {
         List<PhotoResponseDTO> timelinePhotos = timelineService.getTimelineForUser(currentUser);
         return ResponseEntity.ok(timelinePhotos);
+    }
+
+    /**
+     * Deletes a timeline entry for the currently authenticated user.
+     *
+     * This method removes an existing timeline entry associated with the specified photo ID from the
+     * currently authenticated user's timeline. If the timeline entry does not exist, an exception is thrown.
+     *
+     * @param currentUser the currently authenticated user requesting the deletion
+     * @param photoId the unique identifier of the photo whose timeline entry is to be deleted
+     * @return a {@code ResponseEntity<Void>} representing the HTTP response with a 204 No Content status upon successful deletion
+     */
+    @DeleteMapping("/entries/{photoId}")
+    public ResponseEntity<Void> deleteTimelineEntry(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable UUID photoId) {
+
+        timelineService.deleteTimelineEntry(currentUser, photoId);
+        return ResponseEntity.noContent().build(); // 204 No Content bei Erfolg
     }
 }

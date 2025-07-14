@@ -6,7 +6,9 @@ import com.chaptime.backend.model.User;
 import com.chaptime.backend.repository.TimelineEntryRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.chaptime.backend.repository.PhotoRepository;
+import com.chaptime.backend.model.Photo;
+import java.util.UUID;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -14,9 +16,11 @@ import java.util.stream.Collectors;
 public class TimelineService {
 
     private final TimelineEntryRepository timelineEntryRepository;
+    private final PhotoRepository photoRepository;
 
-    public TimelineService(TimelineEntryRepository timelineEntryRepository) {
+    public TimelineService(TimelineEntryRepository timelineEntryRepository, PhotoRepository photoRepository) {
         this.timelineEntryRepository = timelineEntryRepository;
+        this.photoRepository = photoRepository;
     }
 
     @Transactional(readOnly = true)
@@ -37,5 +41,15 @@ public class TimelineService {
                     );
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void deleteTimelineEntry(User user, UUID photoId) {
+        // Finde zuerst das zugehörige Photo-Objekt
+        Photo photo = photoRepository.findById(photoId)
+                .orElseThrow(() -> new RuntimeException("Photo not found with ID: " + photoId));
+
+        // Lösche den Timeline-Eintrag für diesen User und dieses Foto
+        timelineEntryRepository.deleteByUserAndPhoto(user, photo);
     }
 }
