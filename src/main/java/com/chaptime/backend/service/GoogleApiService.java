@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.function.Function;
 
 @Service
 public class GoogleApiService {
@@ -39,51 +40,41 @@ public class GoogleApiService {
     public List<PlaceDTO> findNearbyPlaces(double latitude, double longitude) {
         Map<String, PlaceDTO> placesMap = new LinkedHashMap<>();
         LatLng coords = new LatLng(latitude, longitude);
-        PlaceDTO preciseAddressDto = null;
 
-        // --- STUFE 1: Exakte Adresse holen ---
+        // STUFE 1: Exakte Adresse per Reverse Geocoding holen
         try {
             GeocodingResult[] geocodingResults = GeocodingApi.reverseGeocode(geoApiContext, coords).await();
-            Optional<GeocodingResult> bestAddress = findBestGeocodingResult(geocodingResults);
-
-            if (bestAddress.isPresent()) {
-                preciseAddressDto = saveOrUpdatePlace(bestAddress.get(), coords);
-                placesMap.put(preciseAddressDto.googlePlaceId(), preciseAddressDto);
-                logger.info("Found precise address via Geocoding: {}", preciseAddressDto.name());
-            }
+            findBestGeocodingResult(geocodingResults)
+                    .ifPresent(bestResult -> {
+                        PlaceDTO precisePlace = saveOrUpdatePlace(bestResult, coords);
+                        placesMap.put(precisePlace.googlePlaceId(), precisePlace);
+                    });
         } catch (Exception e) {
             logger.error("Error calling Google Geocoding API: {}", e.getMessage());
         }
 
-        // --- STUFE 2: POIs in der Nähe holen ---
+        // STUFE 2: POIs in der Nähe holen
         try {
             PlacesSearchResponse placesResponse = PlacesApi.nearbySearchQuery(geoApiContext, coords)
-                    .radius(25).rankby(RankBy.PROMINENCE).await();
-
-            final String preciseName = (preciseAddressDto != null) ? preciseAddressDto.name() : "";
+                    .radius(50).rankby(RankBy.PROMINENCE).await();
 
             Arrays.stream(placesResponse.results)
                     .map(this::saveOrUpdatePlaceFromPoi)
-                    // --- NEUE FILTERLOGIK ---
-                    // Filtere Duplikate und Orte mit zu ähnlichen Namen heraus
-                    .filter(poiDto -> !placesMap.containsKey(poiDto.googlePlaceId()) && !isSimilarName(preciseName, poiDto.name()))
-                    .forEach(placeDto -> placesMap.put(placeDto.googlePlaceId(), placeDto));
+                    // Füge nur hinzu, wenn die Google Place ID noch nicht existiert
+                    .forEach(placeDto -> placesMap.putIfAbsent(placeDto.googlePlaceId(), placeDto));
 
         } catch (Exception e) {
             logger.error("Error calling Google Places API: {}", e.getMessage());
         }
 
-        return new ArrayList<>(placesMap.values());
+        // Finale De-Duplizierung basierend auf dem Namen, um Fälle wie "Bierhübeli" (doppelt) zu behandeln
+        // Wir behalten die Reihenfolge bei (Geocoding-Ergebnis zuerst)
+        return new ArrayList<>(placesMap.values().stream()
+                .collect(Collectors.toMap(PlaceDTO::name, Function.identity(), (e1, e2) -> e1, LinkedHashMap::new))
+                .values());
     }
 
-    private boolean isSimilarName(String preciseName, String poiName) {
-        if (preciseName.isEmpty() || poiName.isEmpty()) return false;
-        // Einfache Logik: Wenn der Name des POI den Strassennamen der exakten Adresse enthält,
-        // gehen wir von einem Duplikat aus (z.B. "Brunnenweg 14" vs. "Brunnenweg 5-1").
-        // Diese Logik kann bei Bedarf verfeinert werden.
-        String streetName = preciseName.split(" ")[0];
-        return poiName.contains(streetName);
-    }
+    // --- Private Helper-Methoden (unverändert) ---
 
     private Optional<GeocodingResult> findBestGeocodingResult(GeocodingResult[] results) {
         if (results == null || results.length == 0) return Optional.empty();
