@@ -15,7 +15,7 @@ public interface FeedRepository extends JpaRepository<Photo, UUID> {
         SELECT DISTINCT ph.*
         FROM
             photos ph,
-            jsonb_to_recordset(:historyJson::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
+            jsonb_to_recordset(?::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
         WHERE
             ph.visibility = 'PUBLIC'
             -- Der Radius wird jetzt als dynamischer Parameter übergeben
