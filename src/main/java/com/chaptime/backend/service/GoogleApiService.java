@@ -58,7 +58,7 @@ public class GoogleApiService {
         // --- STUFE 2: POIs in der Nähe holen ---
         try {
             PlacesSearchResponse placesResponse = PlacesApi.nearbySearchQuery(geoApiContext, coords)
-                    .radius(50).rankby(RankBy.PROMINENCE).await();
+                    .radius(25).rankby(RankBy.PROMINENCE).await();
 
             final String preciseName = (preciseAddressDto != null) ? preciseAddressDto.name() : "";
 
