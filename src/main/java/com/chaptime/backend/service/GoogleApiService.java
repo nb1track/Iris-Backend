@@ -66,7 +66,7 @@ public class GoogleApiService {
         // --- STUFE 2: Places API für interessante Orte (POIs) ---
         try {
             PlacesSearchResponse placesResponse = PlacesApi.nearbySearchQuery(geoApiContext, coords)
-                    .radius(50) // Radius für POIs
+                    .radius(25) // Radius für POIs
                     .await();
 
             Arrays.stream(placesResponse.results)
@@ -148,7 +148,6 @@ public class GoogleApiService {
     // Bereinigt den Adress-String, um nur die Strasse und Hausnummer zu behalten
     private String cleanAddressName(String fullAddress) {
         if (fullAddress == null) return null;
-        // Beispiel: "Brunnenweg 14, 3053 Münchenbuchsee, Schweiz" -> "Brunnenweg 14"
         return fullAddress.split(",")[0];
     }
 }
