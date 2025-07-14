@@ -12,17 +12,17 @@ import java.util.UUID;
 public interface FeedRepository extends JpaRepository<Photo, UUID> {
 
     @Query(value = """
-        SELECT DISTINCT ph.*
-        FROM
-            photos ph,
-            jsonb_to_recordset(?::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
-        WHERE
-            ph.visibility = 'PUBLIC'
-            -- Der Radius wird jetzt als dynamischer Parameter übergeben
-            AND ST_DWithin(ph.location, ST_MakePoint(h.longitude, h.latitude)::geography, :radiusInMeters)
-            AND ph.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
-        ORDER BY ph.uploaded_at DESC
-        """, nativeQuery = true)
+    SELECT DISTINCT ph.*
+    FROM
+        photos ph,
+        -- Wir benutzen jetzt einen einfachen, unbenannten Parameter '?'
+        jsonb_to_recordset(?::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
+    WHERE
+        ph.visibility = 'PUBLIC'
+        AND ST_DWithin(ph.location, ST_MakePoint(h.longitude, h.latitude)::geography, radiusInMeter)
+        AND ph.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
+    ORDER BY ph.uploaded_at DESC
+    """, nativeQuery = true)
         // Die Methode akzeptiert jetzt den Radius als Parameter
     List<Photo> findPhotosMatchingHistoricalBatch(
             @Param("historyJson") String historyJson,
