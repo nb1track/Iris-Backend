@@ -48,30 +48,28 @@ public class FeedService {
             return List.of();
         }
 
-        // 1. Nimm den letzten Punkt der History als "Stichprobe"
+        // ... (deine Logik für den adaptiven Radius bleibt unverändert)
         HistoricalPointDTO latestPoint = history.get(history.size() - 1);
-
-        // 2. Prüfe die Ortsdichte an diesem Punkt
         List<PlaceDTO> nearbyPlacesSample = googleApiService.findNearbyPlaces(latestPoint.latitude(), latestPoint.longitude());
-
-        // 3. Lege den Radius basierend auf der Dichte fest
         double adaptiveRadius;
         if (nearbyPlacesSample.size() > 10) {
-            adaptiveRadius = 50; // Dichte Stadt: 50m Radius
+            adaptiveRadius = 50;
         } else if (nearbyPlacesSample.size() > 2) {
-            adaptiveRadius = 100; // Vorort/Kleinstadt: 100m Radius
+            adaptiveRadius = 100;
         } else {
-            adaptiveRadius = 300; // Ländlich: 300m Radius
+            adaptiveRadius = 300;
         }
         System.out.println("ADAPTIVE RADIUS SET TO: " + adaptiveRadius + "m based on " + nearbyPlacesSample.size() + " nearby places.");
-        // --- ENDE NEUE LOGIK ---
+        // ---
+
         try {
             String historyJson = objectMapper.writeValueAsString(history);
-            // Übergib den neu berechneten Radius an die Datenbank
             List<Photo> photos = feedRepository.findPhotosMatchingHistoricalBatch(historyJson, adaptiveRadius);
 
             // Gruppiere die gefundenen Fotos nach ihrem Ort (Place)
             Map<PlaceDTO, List<PhotoResponseDTO>> groupedByPlace = photos.stream()
+                    // ===== KORREKTUR: Füge diese Filterzeile hinzu =====
+                    .filter(photo -> photo.getPlace() != null) // Verhindert die NullPointerException
                     .collect(Collectors.groupingBy(
                             // Schlüssel für die Gruppierung: das PlaceDTO des Fotos
                             photo -> new PlaceDTO(
