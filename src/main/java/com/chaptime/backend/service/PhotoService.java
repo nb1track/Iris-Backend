@@ -154,6 +154,10 @@ public class PhotoService {
                 .map(photo -> new PhotoResponseDTO(
                         photo.getId(),
                         photo.getStorageUrl(),
+                        photo.getUploadedAt(),
+                        photo.getPlace().getId().intValue(),
+                        photo.getPlace().getName(),
+                        photo.getUploader().getId(),
                         photo.getUploader().getUsername()
                 ))
                 .collect(Collectors.toList());
@@ -214,6 +218,10 @@ public class PhotoService {
                     .map(photo -> new PhotoResponseDTO(
                             photo.getId(),
                             photo.getStorageUrl(),
+                            photo.getUploadedAt(),
+                            photo.getPlace().getId().intValue(),
+                            photo.getPlace().getName(),
+                            photo.getUploader().getId(),
                             photo.getUploader().getUsername()
                     ))
                     .collect(Collectors.toList());

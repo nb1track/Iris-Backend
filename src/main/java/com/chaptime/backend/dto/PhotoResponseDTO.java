@@ -1,5 +1,6 @@
 package com.chaptime.backend.dto;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -18,5 +19,9 @@ import java.util.UUID;
 public record PhotoResponseDTO(
         UUID photoId,
         String storageUrl,
-        String uploaderUsername
+        OffsetDateTime timestamp,
+        int placeId,
+        String placeName,
+        UUID userId,
+        String username
 ) {}
