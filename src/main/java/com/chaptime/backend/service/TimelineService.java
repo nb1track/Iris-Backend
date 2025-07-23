@@ -37,6 +37,10 @@ public class TimelineService {
                     return new PhotoResponseDTO(
                             photo.getId(),
                             photo.getStorageUrl(),
+                            photo.getUploadedAt(),
+                            photo.getPlace().getId().intValue(),
+                            photo.getPlace().getName(),
+                            photo.getUploader().getId(),
                             photo.getUploader().getUsername()
                     );
                 })
