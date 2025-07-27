@@ -14,6 +14,8 @@ import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.slf4j.Logger; // NEU
+import org.slf4j.LoggerFactory; // NEU
 
 import java.util.List;
 
@@ -23,6 +25,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class); // NEU
 
     /**
      * Constructs a new UserController instance with the specified UserService.
@@ -89,6 +92,7 @@ public class UserController {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody SignUpRequestDTO signUpRequest) {
 
+        logger.info("====== SIGNUP ENDPOINT REACHED for user: {} ======", signUpRequest.username()); // NEU
         // Manuelle Token-Verifizierung nur für diesen Endpunkt
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();

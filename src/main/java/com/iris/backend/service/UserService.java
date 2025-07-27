@@ -15,6 +15,9 @@ import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger; // NEU
+import org.slf4j.LoggerFactory; // NEU
+import org.springframework.transaction.annotation.Transactional; // NEU
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -31,6 +34,7 @@ public class UserService {
     private final FriendshipRepository friendshipRepository;
     private final GcsStorageService gcsStorageService;
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class); // NEU
 
     public UserService(UserRepository userRepository, PhotoRepository photoRepository, FriendshipRepository friendshipRepository, GcsStorageService gcsStorageService) {
         this.userRepository = userRepository;
@@ -100,13 +104,18 @@ public class UserService {
 
     public User registerNewUser(FirebaseToken decodedToken, String username) {
         if (userRepository.findByFirebaseUid(decodedToken.getUid()).isPresent()) {
+            logger.warn("Attempted to register an already existing user with UID: {}", decodedToken.getUid()); // NEU
             throw new IllegalStateException("User already exists in our database.");
         }
         User newUser = new User();
         newUser.setFirebaseUid(decodedToken.getUid());
         newUser.setEmail(decodedToken.getEmail());
         newUser.setUsername(username);
-        return userRepository.save(newUser);
+
+        logger.info("--> Attempting to save new user '{}' with UID {}", username, decodedToken.getUid()); // NEU
+        User savedUser = userRepository.save(newUser);
+        logger.info("<-- Successfully saved new user with database ID {}", savedUser.getId()); // NEU
+        return savedUser;
     }
 
     /**
