@@ -88,7 +88,7 @@ public class UserController {
      *         or 401 (Unauthorized) if the token is invalid or missing
      */
     @PostMapping("/signup")
-    public ResponseEntity<UserDTO> registerUser(
+    public ResponseEntity<?> registerUser(
             @RequestHeader("Authorization") String authHeader,
             @RequestBody SignUpRequestDTO signUpRequest) {
 
@@ -106,11 +106,16 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.CREATED).body(userDTO);
 
         } catch (FirebaseAuthException e) {
-            // DIESE LOG-ZEILE IST DER SCHLÜSSEL ZUR LÖSUNG
             logger.error("!!! FIREBASE TOKEN VERIFICATION FAILED !!!", e);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+            // --- DAS IST DIE ENTSCHEIDENDE ÄNDERUNG ---
+            // Wir erstellen eine detaillierte Fehlermeldung
+            String errorMessage = "Firebase Auth Error: " + e.getMessage() + " | Error Code: " + e.getAuthErrorCode().toString();
+            // Und senden sie mit dem Status 401 zurück
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorMessage);
+
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(null);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
         }
     }
 
