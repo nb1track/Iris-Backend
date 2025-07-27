@@ -7,11 +7,11 @@
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.3.1</version>
         <relativePath/> </parent>
-    <groupId>com.chaptime.backend</groupId>
-    <artifactId>Chaptime-Backend</artifactId>
+    <groupId>com.iris.backend</groupId>
+    <artifactId>Iris-Backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>Chaptime-Backend</name>
-    <description>Backend for Chaptime Application</description>
+    <name>Iris-Backend</name>
+    <description>Backend for Iris Application</description>
     <properties>
         <java.version>21</java.version>
         <spring-cloud-gcp.version>5.5.0</spring-cloud-gcp.version>
@@ -125,7 +125,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <image>
-                        <name>europe-west6-docker.pkg.dev/lithe-aileron-464013-f1/chaptime-repo/chaptime-backend:v1</name>
+                        <name>europe-west6-docker.pkg.dev/iris-467209/chaptime-repo/iris-backend:v1</name>
                     </image>
                 </configuration>
             </plugin>
