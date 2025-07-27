@@ -92,8 +92,8 @@ public class UserController {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody SignUpRequestDTO signUpRequest) {
 
-        logger.info("====== SIGNUP ENDPOINT REACHED for user: {} ======", signUpRequest.username()); // NEU
-        // Manuelle Token-Verifizierung nur für diesen Endpunkt
+        logger.info("====== SIGNUP ENDPOINT REACHED for user: {} ======", signUpRequest.username());
+
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -101,16 +101,16 @@ public class UserController {
 
         try {
             FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
-
             User newUser = userService.registerNewUser(decodedToken, signUpRequest.username());
-
             UserDTO userDTO = new UserDTO(newUser.getId(), newUser.getUsername());
             return ResponseEntity.status(HttpStatus.CREATED).body(userDTO);
 
         } catch (FirebaseAuthException e) {
+            // DIESE LOG-ZEILE IST DER SCHLÜSSEL ZUR LÖSUNG
+            logger.error("!!! FIREBASE TOKEN VERIFICATION FAILED !!!", e);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(null); // 409 Conflict if user exists
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(null);
         }
     }
 
