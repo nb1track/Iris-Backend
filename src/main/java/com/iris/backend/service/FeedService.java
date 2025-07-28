@@ -20,11 +20,13 @@ public class FeedService {
     private final FeedRepository feedRepository;
     private final ObjectMapper objectMapper;
     private final GoogleApiService googleApiService; // NEU: Google Service für die Dichte-Prüfung
+    private final GcsStorageService gcsStorageService;
 
-    public FeedService(FeedRepository feedRepository, ObjectMapper objectMapper, GoogleApiService googleApiService) {
+    public FeedService(FeedRepository feedRepository, ObjectMapper objectMapper, GoogleApiService googleApiService, GcsStorageService gcsStorageService) {
         this.feedRepository = feedRepository;
         this.objectMapper = objectMapper;
         this.googleApiService = googleApiService; // NEU
+        this.gcsStorageService = gcsStorageService;
     }
 
     /**
@@ -83,7 +85,7 @@ public class FeedService {
                             Collectors.mapping(
                                     photo -> new PhotoResponseDTO(
                                             photo.getId(),
-                                            photo.getStorageUrl(),
+                                            gcsStorageService.generateSignedUrl(photo.getStorageUrl()),
                                             photo.getUploadedAt(),
                                             photo.getPlace().getId().intValue(),
                                             photo.getPlace().getName(),

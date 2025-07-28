@@ -1,5 +1,6 @@
 package com.iris.backend.service;
 
+import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
@@ -10,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.UUID;
+import java.net.URL;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class GcsStorageService {
@@ -64,6 +67,29 @@ public class GcsStorageService {
             }
         } catch (Exception e) {
             logger.error("Failed to delete file {}: {}", fileUrl, e.getMessage());
+        }
+    }
+
+    /**
+     * Generiert eine zeitlich begrenzte, signierte URL für ein privates GCS-Objekt.
+     * @param fileUrl Die permanente URL des Objekts (z.B. aus der Datenbank)
+     * @return Eine temporäre URL, die für 15 Minuten gültig ist.
+     */
+    public String generateSignedUrl(String fileUrl) {
+        try {
+            // Extrahiert den Dateinamen aus der URL
+            String objectName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
+            BlobId blobId = BlobId.of(bucketName, objectName);
+            BlobInfo blobInfo = BlobInfo.newBuilder(blobId).build();
+
+            // Generiert eine URL mit V4-Signatur, die 15 Minuten gültig ist
+            URL signedUrl = storage.signUrl(blobInfo, 15, TimeUnit.MINUTES, Storage.SignUrlOption.withV4Signature());
+
+            return signedUrl.toString();
+        } catch (Exception e) {
+            logger.error("Could not generate signed URL for {}", fileUrl, e);
+            // Gibt im Fehlerfall die originale URL zurück, die aber nicht funktionieren wird
+            return fileUrl;
         }
     }
 }

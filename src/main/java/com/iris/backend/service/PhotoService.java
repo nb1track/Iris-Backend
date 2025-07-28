@@ -152,7 +152,7 @@ public class PhotoService {
         return photos.stream()
                 .map(photo -> new PhotoResponseDTO(
                         photo.getId(),
-                        photo.getStorageUrl(),
+                        gcsStorageService.generateSignedUrl(photo.getStorageUrl()),
                         photo.getUploadedAt(),
                         photo.getPlace().getId().intValue(),
                         photo.getPlace().getName(),
@@ -216,7 +216,7 @@ public class PhotoService {
             return photos.stream()
                     .map(photo -> new PhotoResponseDTO(
                             photo.getId(),
-                            photo.getStorageUrl(),
+                            gcsStorageService.generateSignedUrl(photo.getStorageUrl()),
                             photo.getUploadedAt(),
                             photo.getPlace().getId().intValue(),
                             photo.getPlace().getName(),
