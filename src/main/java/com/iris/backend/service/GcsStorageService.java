@@ -1,9 +1,6 @@
 package com.iris.backend.service;
 
-import com.google.cloud.storage.Blob;
-import com.google.cloud.storage.BlobId;
-import com.google.cloud.storage.BlobInfo;
-import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -103,6 +100,30 @@ public class GcsStorageService {
             logger.error("Could not generate signed URL for {}", fileUrl, e);
             // Gibt im Fehlerfall die originale URL zurück, die aber nicht funktionieren wird
             return fileUrl;
+        }
+    }
+
+    /**
+     * Generiert eine zeitlich begrenzte, signierte URL für ein privates Cloud Storage Objekt.
+     *
+     * @param objectName Der Name der Datei im Bucket (z.B. der Firebase UID des Users).
+     * @return Eine signierte URL als String.
+     */
+    public String generateSignedUrlForProfilePicture(String objectName) {
+        String BUCKET_NAME = "iris-user-profile-images";
+        BlobInfo blobInfo = BlobInfo.newBuilder(BUCKET_NAME, objectName).build();
+
+        // Definiere die Gültigkeitsdauer der URL (hier: 15 Minuten)
+        long duration = 15;
+        TimeUnit unit = TimeUnit.MINUTES;
+
+        try {
+            // Generiere die signierte URL
+            return storage.signUrl(blobInfo, duration, unit, Storage.SignUrlOption.withV4Signature()).toString();
+        } catch (StorageException e) {
+            // Logge den Fehler und wirf eine spezifische Exception für den Controller
+            System.err.println("Error generating signed URL: " + e.getMessage());
+            throw new RuntimeException("Could not generate signed URL for object: " + objectName, e);
         }
     }
 }

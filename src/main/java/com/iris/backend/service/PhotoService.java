@@ -223,7 +223,7 @@ public class PhotoService {
                             photo.getPlace().getName(),
                             photo.getUploader().getId(),
                             photo.getUploader().getUsername(),
-                            photo.getUploader().getProfileImageUrl()
+                            gcsStorageService.generateSignedUrlForProfilePicture(photo.getUploader().getProfileImageUrl())
                     ))
                     .collect(Collectors.toList());
 
