@@ -150,16 +150,7 @@ public class PhotoService {
                         OffsetDateTime.now()
                 );
         return photos.stream()
-                .map(photo -> new PhotoResponseDTO(
-                        photo.getId(),
-                        gcsStorageService.generateSignedUrl(photo.getStorageUrl()),
-                        photo.getUploadedAt(),
-                        photo.getPlace().getId().intValue(),
-                        photo.getPlace().getName(),
-                        photo.getUploader().getId(),
-                        photo.getUploader().getUsername(),
-                        photo.getUploader().getProfileImageUrl()
-                ))
+                .map(this::toPhotoResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -215,21 +206,44 @@ public class PhotoService {
             List<Photo> photos = photoRepository.findPhotosForPlaceMatchingHistoricalBatch(placeId, historyJson);
 
             return photos.stream()
-                    .map(photo -> new PhotoResponseDTO(
-                            photo.getId(),
-                            gcsStorageService.generateSignedUrl(photo.getStorageUrl()),
-                            photo.getUploadedAt(),
-                            photo.getPlace().getId().intValue(),
-                            photo.getPlace().getName(),
-                            photo.getUploader().getId(),
-                            photo.getUploader().getUsername(),
-                            photo.getUploader().getProfileImageUrl()
-                    ))
+                    .map(this::toPhotoResponseDTO)
                     .collect(Collectors.toList());
 
         } catch (JsonProcessingException e) {
             // Hier könntest du einen Fehler loggen
             throw new RuntimeException("Error processing historical photo data", e);
         }
+    }
+
+    /**
+     * Converts a Photo entity to a PhotoResponseDTO, generating signed URLs for the photo
+     * and the uploader's profile picture.
+     *
+     * @param photo The Photo entity to convert.
+     * @return A PhotoResponseDTO with signed URLs.
+     */
+    private PhotoResponseDTO toPhotoResponseDTO(Photo photo) {
+        User uploader = photo.getUploader();
+        String profileImageUrl = uploader.getProfileImageUrl();
+
+        // Generate a signed URL for the main photo
+        String signedPhotoUrl = gcsStorageService.generateSignedUrl(photo.getStorageUrl());
+
+        // Generate a signed URL for the profile picture, if it exists.
+        String signedProfileImageUrl = null;
+        if (profileImageUrl != null && !profileImageUrl.isBlank()) {
+            signedProfileImageUrl = gcsStorageService.generateSignedUrl(profileImageUrl);
+        }
+
+        return new PhotoResponseDTO(
+                photo.getId(),
+                signedPhotoUrl,
+                photo.getUploadedAt(),
+                photo.getPlace().getId().intValue(),
+                photo.getPlace().getName(),
+                uploader.getId(),
+                uploader.getUsername(),
+                signedProfileImageUrl
+        );
     }
 }
