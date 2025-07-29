@@ -69,17 +69,8 @@ public class FriendshipService {
                 .findByUserOneAndStatusOrUserTwoAndStatus(user, FriendshipStatus.ACCEPTED, user, FriendshipStatus.ACCEPTED);
 
         return friendships.stream()
-                .map(friendship -> {
-                    User friend = friendship.getUserOne().getId().equals(userId) ? friendship.getUserTwo() : friendship.getUserOne();
-
-                    // KORREKTUR: Signierte URL generieren
-                    String signedProfileUrl = null;
-                    if (friend.getProfileImageUrl() != null && !friend.getProfileImageUrl().isBlank()) {
-                        signedProfileUrl = gcsStorageService.generateSignedUrl(friend.getProfileImageUrl());
-                    }
-
-                    return new UserDTO(friend.getId(), friend.getUsername(), signedProfileUrl);
-                })
+                .map(friendship -> friendship.getUserOne().getId().equals(userId) ? friendship.getUserTwo() : friendship.getUserOne())
+                .map(this::toUserDTOWithSignedUrl)
                 .collect(Collectors.toList());
     }
 
@@ -274,17 +265,24 @@ public class FriendshipService {
         return nearbyFriends.stream()
                 .filter(friend -> friend.getLastLocationUpdatedAt() != null &&
                         Duration.between(friend.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes() <= 5)
-                .map(friend -> {
-                    String signedUrl = null;
-                    String objectName = friend.getProfileImageUrl(); // Den Objektnamen holen
-
-                    // KORREKTUR: Korrekte Methode und korrekten Parameter verwenden
-                    if (objectName != null && !objectName.isBlank()) {
-                        signedUrl = gcsStorageService.generateSignedUrl(objectName);
-                    }
-
-                    return new UserDTO(friend.getId(), friend.getUsername(), signedUrl);
-                })
+                .map(this::toUserDTOWithSignedUrl)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Converts a User entity to a UserDTO, generating a signed URL for the profile picture if available.
+     *
+     * @param user The User entity to convert.
+     * @return A UserDTO with the user's ID, username, and a signed URL for the profile picture.
+     */
+    private UserDTO toUserDTOWithSignedUrl(User user) {
+        String signedProfileUrl = null;
+        String objectName = user.getProfileImageUrl();
+
+        if (objectName != null && !objectName.isBlank()) {
+            signedProfileUrl = gcsStorageService.generateSignedUrl(objectName);
+        }
+
+        return new UserDTO(user.getId(), user.getUsername(), signedProfileUrl);
     }
 }
