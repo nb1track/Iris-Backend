@@ -10,4 +10,4 @@ package com.iris.backend.dto;
  * Fields:
  * - username: The unique username selected by the user for their account.
  */
-public record SignUpRequestDTO(String username) {}
+public record SignUpRequestDTO(String username, String base64Image) {}

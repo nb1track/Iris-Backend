@@ -52,6 +52,9 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 

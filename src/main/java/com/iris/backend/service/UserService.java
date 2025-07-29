@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional; // NEU
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -102,7 +103,7 @@ public class UserService {
         userRepository.delete(user);
     }
 
-    public User registerNewUser(FirebaseToken decodedToken, String username) {
+    public User registerNewUser(FirebaseToken decodedToken, String username, String base64Image) {
         if (userRepository.findByFirebaseUid(decodedToken.getUid()).isPresent()) {
             logger.warn("Attempted to register an already existing user with UID: {}", decodedToken.getUid()); // NEU
             throw new IllegalStateException("User already exists in our database.");
@@ -111,6 +112,16 @@ public class UserService {
         newUser.setFirebaseUid(decodedToken.getUid());
         newUser.setEmail(decodedToken.getEmail());
         newUser.setUsername(username);
+
+        byte[] imageBytes;
+        try {
+            imageBytes = Base64.getDecoder().decode(base64Image);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid base64 image provided.");
+        }
+
+        String imageUrl = gcsStorageService.uploadProfileImage(decodedToken.getUid(), imageBytes);
+        newUser.setProfileImageUrl(imageUrl);
 
         logger.info("--> Attempting to save new user '{}' with UID {}", username, decodedToken.getUid()); // NEU
         User savedUser = userRepository.save(newUser);

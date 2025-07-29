@@ -48,6 +48,19 @@ public class GcsStorageService {
         return "https://storage.googleapis.com/" + bucketName + "/" + uniqueFileName;
     }
 
+
+    public String uploadProfileImage(String uid, byte[] imageBytes) {
+        String profileImageBucketName = "iris-user-profile-images";
+        String fileName = uid + ".jpg";
+        BlobId blobId = BlobId.of(profileImageBucketName, fileName);
+        BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
+                .setContentType("image/jpeg")
+                .build();
+
+        storage.create(blobInfo, imageBytes);
+        return String.format("https://storage.googleapis.com/%s/%s", profileImageBucketName, fileName);
+    }
+
     /**
      * Deletes a file from the configured Google Cloud Storage bucket.
      * If the specified file does not exist in the bucket, a warning is logged.

@@ -101,7 +101,7 @@ public class UserController {
 
         try {
             FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
-            User newUser = userService.registerNewUser(decodedToken, signUpRequest.username());
+            User newUser = userService.registerNewUser(decodedToken, signUpRequest.username(), signUpRequest.base64Image());
             UserDTO userDTO = new UserDTO(newUser.getId(), newUser.getUsername());
             return ResponseEntity.status(HttpStatus.CREATED).body(userDTO);
 
