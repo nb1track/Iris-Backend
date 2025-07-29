@@ -71,7 +71,14 @@ public class FriendshipService {
         return friendships.stream()
                 .map(friendship -> {
                     User friend = friendship.getUserOne().getId().equals(userId) ? friendship.getUserTwo() : friendship.getUserOne();
-                    return new UserDTO(friend.getId(), friend.getUsername(), friend.getProfileImageUrl());
+
+                    // KORREKTUR: Signierte URL generieren
+                    String signedProfileUrl = null;
+                    if (friend.getProfileImageUrl() != null && !friend.getProfileImageUrl().isBlank()) {
+                        signedProfileUrl = gcsStorageService.generateSignedUrl(friend.getProfileImageUrl());
+                    }
+
+                    return new UserDTO(friend.getId(), friend.getUsername(), signedProfileUrl);
                 })
                 .collect(Collectors.toList());
     }
@@ -250,34 +257,32 @@ public class FriendshipService {
     @Transactional(readOnly = true)
     public List<UserDTO> findNearbyFriendsAtPlace(User currentUser, Point placeLocation) {
         if (placeLocation == null) {
-            return List.of(); // Sicherstellen, dass nichts passiert, wenn der Ort keine Koordinaten hat
+            return List.of();
         }
 
-        // 1. IDs aller Freunde holen
         List<UUID> friendIds = getFriendsAsEntities(currentUser.getId()).stream()
                 .map(User::getId)
                 .collect(Collectors.toList());
 
         if (friendIds.isEmpty()) {
-            return List.of(); // Wenn keine Freunde, dann keine Freunde in der Nähe
+            return List.of();
         }
 
         double radius = 100.0; // 100 Meter Radius
-
-        // 2. Rufe die neue, saubere Repository-Methode auf
         List<User> nearbyFriends = userRepository.findFriendsByIdsAndLocation(friendIds, placeLocation, radius);
 
-        // 3. Filtere nach Zeit und wandle in DTOs um (inkl. Profilbild-URL)
         return nearbyFriends.stream()
                 .filter(friend -> friend.getLastLocationUpdatedAt() != null &&
                         Duration.between(friend.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes() <= 5)
                 .map(friend -> {
                     String signedUrl = null;
-                    // Nur eine URL generieren, wenn der Freund ein Profilbild hat
-                    if (friend.getProfileImageUrl() != null && !friend.getProfileImageUrl().isEmpty()) {
-                        signedUrl = gcsStorageService.generateSignedUrlForProfilePicture(friend.getFirebaseUid());
+                    String objectName = friend.getProfileImageUrl(); // Den Objektnamen holen
+
+                    // KORREKTUR: Korrekte Methode und korrekten Parameter verwenden
+                    if (objectName != null && !objectName.isBlank()) {
+                        signedUrl = gcsStorageService.generateSignedUrl(objectName);
                     }
-                    // Erstelle das DTO mit allen drei benötigten Informationen
+
                     return new UserDTO(friend.getId(), friend.getUsername(), signedUrl);
                 })
                 .collect(Collectors.toList());
