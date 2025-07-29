@@ -159,16 +159,16 @@ public class PhotoService {
         String signedPhotoUrl = gcsStorageService.generateSignedUrl(
                 photosBucketName,
                 photo.getStorageUrl(),
-                1,
-                TimeUnit.HOURS
+                15,
+                TimeUnit.MINUTES
         );
 
         // 2. Signierte URL für das Profilbild des Uploaders generieren (z.B. 1 Stunde gültig)
         String signedProfileImageUrl = gcsStorageService.generateSignedUrl(
                 profileImagesBucketName,
                 uploader.getProfileImageUrl(),
-                1,
-                TimeUnit.HOURS
+                15,
+                TimeUnit.MINUTES
         );
 
         return new PhotoResponseDTO(
