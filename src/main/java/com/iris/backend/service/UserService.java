@@ -131,7 +131,14 @@ public class UserService {
 
     /**
      * Finds nearby users who are not already friends, have no pending requests,
-     * and have an up-to-date location.
+     * and have an up-to-date location. The returned DTO includes a signed URL
+     * for the profile picture.
+     *
+     * @param latitude       The latitude of the central point.
+     * @param longitude      The longitude of the central point.
+     * @param radiusInMeters The search radius in meters.
+     * @param currentUser    The user performing the search, to exclude them and their existing relations.
+     * @return A list of UserDTOs, each containing the user's ID, username, and a temporary URL for their profile image.
      */
     @Transactional(readOnly = true)
     public List<UserDTO> getNearbyUsers(double latitude, double longitude, double radiusInMeters, User currentUser) {
@@ -165,9 +172,24 @@ public class UserService {
                 })
                 .collect(Collectors.toList());
 
-        // 4. Wandle das Ergebnis in DTOs um und gib es zurück
+        // 4. Wandle das Ergebnis in DTOs um, inklusive der signierten Profilbild-URL
         return filteredUsers.stream()
-                .map(user -> new UserDTO(user.getId(), user.getUsername()))
+                .map(user -> {
+                    String signedProfileUrl = null;
+                    // Prüfe, ob eine Bild-URL in der Datenbank existiert
+                    if (user.getProfileImageUrl() != null && !user.getProfileImageUrl().isEmpty()) {
+                        // Generiere die temporäre, sichere URL.
+                        // Der Dateiname ist die Firebase-UID.
+                        signedProfileUrl = gcsStorageService.generateSignedUrlForProfilePicture(user.getFirebaseUid());
+                    }
+
+                    // Erstelle das DTO mit der ID, dem Namen und der (eventuell null) URL
+                    return new UserDTO(
+                            user.getId(),
+                            user.getUsername(),
+                            signedProfileUrl
+                    );
+                })
                 .collect(Collectors.toList());
     }
 }
