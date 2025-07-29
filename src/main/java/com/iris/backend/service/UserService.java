@@ -180,7 +180,7 @@ public class UserService {
                     if (user.getProfileImageUrl() != null && !user.getProfileImageUrl().isEmpty()) {
                         // Generiere die temporäre, sichere URL.
                         // Der Dateiname ist die Firebase-UID.
-                        signedProfileUrl = gcsStorageService.generateSignedUrlForProfilePicture(user.getFirebaseUid());
+                        signedProfileUrl = gcsStorageService.generateSignedUrlForProfilePicture(user.getProfileImageUrl());
                     }
 
                     // Erstelle das DTO mit der ID, dem Namen und der (eventuell null) URL
