@@ -6,9 +6,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.io.IOException;
-import java.util.UUID;
 import java.net.URL;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -17,115 +18,102 @@ public class GcsStorageService {
     private static final Logger logger = LoggerFactory.getLogger(GcsStorageService.class);
     private final Storage storage;
 
-    @Value("${gcs.bucket.name}")
-    private String bucketName;
+    // Bucket-Namen aus der Konfiguration laden
+    private final String photosBucketName;
+    private final String profileImagesBucketName;
 
     /**
-     * Constructs a new {@code GcsStorageService} with the specified Google Cloud Storage client.
-     *
-     * @param storage the Google Cloud Storage client used for interacting with the storage bucket
+     * Constructs a new GcsStorageService.
+     * Bucket names are injected from application properties.
      */
-    public GcsStorageService(Storage storage) {
+    public GcsStorageService(Storage storage,
+                             @Value("${gcs.bucket.photos.name}") String photosBucketName,
+                             @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName) {
         this.storage = storage;
+        this.photosBucketName = photosBucketName;
+        this.profileImagesBucketName = profileImagesBucketName;
     }
 
     /**
-     * Uploads a file to the configured Google Cloud Storage bucket and generates a public URL for the uploaded file.
+     * Uploads a photo file to the photos bucket.
      *
-     * @param file the file to be uploaded; must be a valid {@code MultipartFile}
-     * @return a public URL where the uploaded file can be accessed
-     * @throws IOException if an error occurs during file upload or reading file data
+     * @param file the photo file to upload.
+     * @return The unique object name of the uploaded file.
+     * @throws IOException if an I/O error occurs.
      */
-    public String uploadFile(MultipartFile file) throws IOException {
-        String uniqueFileName = UUID.randomUUID().toString() + "-" + file.getOriginalFilename();
-        BlobId blobId = BlobId.of(bucketName, uniqueFileName);
-        BlobInfo blobInfo = BlobInfo.newBuilder(blobId).build();
+    public String uploadPhoto(MultipartFile file) throws IOException {
+        String objectName = UUID.randomUUID().toString() + "-" + file.getOriginalFilename();
+        BlobId blobId = BlobId.of(photosBucketName, objectName);
+        BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
+                .setContentType(file.getContentType())
+                .build();
         storage.create(blobInfo, file.getBytes());
-        logger.info("Successfully uploaded file {} to bucket {}", uniqueFileName, bucketName);
-        return "https://storage.googleapis.com/" + bucketName + "/" + uniqueFileName;
+        logger.info("Successfully uploaded photo {} to bucket {}", objectName, photosBucketName);
+        return objectName; // WICHTIG: Nur den Objektnamen zurückgeben
     }
 
-
+    /**
+     * Uploads a profile image to the profile images bucket.
+     *
+     * @param uid        The user's unique identifier, used as the file name.
+     * @param imageBytes The image data.
+     * @return The object name of the uploaded file (e.g., "some-uid.jpg").
+     */
     public String uploadProfileImage(String uid, byte[] imageBytes) {
-        String profileImageBucketName = "iris-user-profile-images";
-        String fileName = uid + ".jpg";
-        BlobId blobId = BlobId.of(profileImageBucketName, fileName);
+        String objectName = uid + ".jpg";
+        BlobId blobId = BlobId.of(profileImagesBucketName, objectName);
         BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
                 .setContentType("image/jpeg")
                 .build();
 
         storage.create(blobInfo, imageBytes);
-        return String.format("https://storage.googleapis.com/%s/%s", profileImageBucketName, fileName);
+        logger.info("Successfully uploaded profile image {} to bucket {}", objectName, profileImagesBucketName);
+        return objectName; // WICHTIG: Nur den Objektnamen zurückgeben
     }
 
     /**
-     * Deletes a file from the configured Google Cloud Storage bucket.
-     * If the specified file does not exist in the bucket, a warning is logged.
-     * If an error occurs during the deletion process, the error is logged.
+     * Deletes an object from a specified bucket.
      *
-     * @param fileUrl the public URL of the file to be deleted; the method extracts the file name
-     *                from the URL to locate and delete the file in the bucket
+     * @param bucketName The name of the bucket.
+     * @param objectName The name of the object to delete.
      */
-    public void deleteFile(String fileUrl) {
+    public void deleteFile(String bucketName, String objectName) {
+        if (objectName == null || objectName.isBlank()) {
+            return;
+        }
         try {
-            String fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
-            BlobId blobId = BlobId.of(bucketName, fileName);
+            BlobId blobId = BlobId.of(bucketName, objectName);
             if (storage.delete(blobId)) {
-                logger.info("Successfully deleted file {} from bucket {}", fileName, bucketName);
+                logger.info("Successfully deleted file {} from bucket {}", objectName, bucketName);
             } else {
-                logger.warn("File {} not found in bucket {} for deletion.", fileName, bucketName);
+                logger.warn("File {} not found in bucket {} for deletion.", objectName, bucketName);
             }
         } catch (Exception e) {
-            logger.error("Failed to delete file {}: {}", fileUrl, e.getMessage());
+            logger.error("Failed to delete file {} from bucket {}: {}", objectName, bucketName, e.getMessage());
         }
     }
 
     /**
-     * Generiert eine zeitlich begrenzte, signierte URL für ein privates GCS-Objekt.
-     * @param fileUrl Die permanente URL des Objekts (z.B. aus der Datenbank)
-     * @return Eine temporäre URL, die für 15 Minuten gültig ist.
-     */
-    public String generateSignedUrl(String fileUrl) {
-        try {
-            // Extrahiert den Dateinamen aus der URL
-            String objectName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
-            BlobId blobId = BlobId.of(bucketName, objectName);
-            BlobInfo blobInfo = BlobInfo.newBuilder(blobId).build();
-
-            // Generiert eine URL mit V4-Signatur, die 15 Minuten gültig ist
-            URL signedUrl = storage.signUrl(blobInfo, 15, TimeUnit.MINUTES, Storage.SignUrlOption.withV4Signature());
-
-            return signedUrl.toString();
-        } catch (Exception e) {
-            logger.error("Could not generate signed URL for {}", fileUrl, e);
-            // Gibt im Fehlerfall die originale URL zurück, die aber nicht funktionieren wird
-            return fileUrl;
-        }
-    }
-
-    /**
-     * Generates a time-limited signed URL for accessing a private Google Cloud Storage object
-     * in the "iris-user-profile-images" bucket.
+     * Generates a signed URL for an object in a specified bucket with a custom expiration.
+     * This is now the single, flexible method for creating all signed URLs.
      *
-     * @param fileUrl the permanent URL of the profile picture object (e.g., retrieved from a database)
-     * @return a temporary signed URL valid for 15 minutes, or the original URL if an error occurs
+     * @param bucketName The bucket containing the object.
+     * @param objectName The name of the object.
+     * @param duration   The numerical value of the duration.
+     * @param timeUnit   The unit of the duration (e.g., TimeUnit.MINUTES).
+     * @return A temporary signed URL, or null if an error occurs.
      */
-    public String generateSignedUrlForProfilePicture(String fileUrl) {
-        String BUCKET_NAME = "iris-user-profile-images";
+    public String generateSignedUrl(String bucketName, String objectName, long duration, TimeUnit timeUnit) {
+        if (objectName == null || objectName.isBlank()) {
+            return null;
+        }
         try {
-            // Extrahiert den Dateinamen aus der URL
-            String objectName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
-            BlobId blobId = BlobId.of(BUCKET_NAME, objectName);
-            BlobInfo blobInfo = BlobInfo.newBuilder(blobId).build();
-
-            // Generiert eine URL mit V4-Signatur, die 15 Minuten gültig ist
-            URL signedUrl = storage.signUrl(blobInfo, 15, TimeUnit.MINUTES, Storage.SignUrlOption.withV4Signature());
-
-            return signedUrl.toString();
+            BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, objectName)).build();
+            URL signedUrl = storage.signUrl(blobInfo, duration, timeUnit, Storage.SignUrlOption.withV4Signature());
+            return signedUrl.toExternalForm();
         } catch (Exception e) {
-            logger.error("Could not generate signed URL for {}", fileUrl, e);
-            // Gibt im Fehlerfall die originale URL zurück, die aber nicht funktionieren wird
-            return fileUrl;
+            logger.error("Could not generate signed URL for object {} in bucket {}: {}", objectName, bucketName, e.getMessage());
+            return null; // Im Fehlerfall null zurückgeben
         }
     }
 }

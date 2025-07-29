@@ -13,11 +13,11 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.slf4j.Logger; // NEU
-import org.slf4j.LoggerFactory; // NEU
-import org.springframework.transaction.annotation.Transactional; // NEU
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -25,6 +25,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,12 +37,23 @@ public class UserService {
     private final GcsStorageService gcsStorageService;
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
     private static final Logger logger = LoggerFactory.getLogger(UserService.class); // NEU
+    private final String photosBucketName;
+    private final String profileImagesBucketName;
 
-    public UserService(UserRepository userRepository, PhotoRepository photoRepository, FriendshipRepository friendshipRepository, GcsStorageService gcsStorageService) {
+    public UserService(
+            UserRepository userRepository,
+            PhotoRepository photoRepository,
+            FriendshipRepository friendshipRepository,
+            GcsStorageService gcsStorageService,
+            @Value("${gcs.bucket.photos.name}") String photosBucketName,
+            @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName
+    ) {
         this.userRepository = userRepository;
         this.photoRepository = photoRepository;
         this.friendshipRepository = friendshipRepository;
         this.gcsStorageService = gcsStorageService;
+        this.photosBucketName = photosBucketName;
+        this.profileImagesBucketName = profileImagesBucketName;
     }
 
     @Transactional
@@ -98,7 +110,13 @@ public class UserService {
 
         List<Photo> photosToDelete = photoRepository.findAllByUploader(user);
         for (Photo photo : photosToDelete) {
-            gcsStorageService.deleteFile(photo.getStorageUrl());
+            // KORRIGIERT: Bucket-Name wird jetzt mitgegeben
+            gcsStorageService.deleteFile(photosBucketName, photo.getStorageUrl());
+        }
+
+        // NEU: Auch das Profilbild aus GCS löschen
+        if (user.getProfileImageUrl() != null && !user.getProfileImageUrl().isBlank()) {
+            gcsStorageService.deleteFile(profileImagesBucketName, user.getProfileImageUrl());
         }
         userRepository.delete(user);
     }
@@ -120,6 +138,7 @@ public class UserService {
             throw new RuntimeException("Invalid base64 image provided.");
         }
 
+        // KORRIGIERT: Speichert nur den Objektnamen, den die neue Methode zurückgibt
         String imageUrl = gcsStorageService.uploadProfileImage(decodedToken.getUid(), imageBytes);
         newUser.setProfileImageUrl(imageUrl);
 
@@ -143,11 +162,11 @@ public class UserService {
     @Transactional(readOnly = true)
     public List<UserDTO> getNearbyUsers(double latitude, double longitude, double radiusInMeters, User currentUser) {
         // 1. Hole alle Benutzer im Radius, außer dem aktuellen User
-        List<User> usersInRadius = userRepository.findUsersNearby(
+        List<User> usersInRadius = userRepository.findNearbyUsersByLocation(
                 latitude,
                 longitude,
                 radiusInMeters,
-                currentUser.getId()
+                currentUser.getId() // KORRIGIERT: Ruft die neue, sichere Repository-Methode auf
         );
 
         // 2. Hole alle IDs von Benutzern, mit denen bereits eine Beziehung besteht (Freunde oder offen)
@@ -175,12 +194,13 @@ public class UserService {
         // 4. Wandle das Ergebnis in DTOs um, inklusive der signierten Profilbild-URL
         return filteredUsers.stream()
                 .map(user -> {
+                    // KORRIGIERT: Nutzt die neue, flexible generateSignedUrl-Methode
                     String signedProfileUrl = null;
-                    // Prüfe, ob eine Bild-URL in der Datenbank existiert
-                    if (user.getProfileImageUrl() != null && !user.getProfileImageUrl().isEmpty()) {
-                        // Generiere die temporäre, sichere URL.
-                        // Der Dateiname ist die Firebase-UID.
-                        signedProfileUrl = gcsStorageService.generateSignedUrlForProfilePicture(user.getProfileImageUrl());
+                    String objectName = user.getProfileImageUrl();
+
+                    if (objectName != null && !objectName.isBlank()) {
+                        // Generiere die temporäre, sichere URL für 15 Minuten
+                        signedProfileUrl = gcsStorageService.generateSignedUrl(profileImagesBucketName, objectName, 15, TimeUnit.MINUTES);
                     }
 
                     // Erstelle das DTO mit der ID, dem Namen und der (eventuell null) URL
