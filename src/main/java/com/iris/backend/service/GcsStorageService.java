@@ -104,26 +104,28 @@ public class GcsStorageService {
     }
 
     /**
-     * Generiert eine zeitlich begrenzte, signierte URL für ein privates Cloud Storage Objekt.
+     * Generates a time-limited signed URL for accessing a private Google Cloud Storage object
+     * in the "iris-user-profile-images" bucket.
      *
-     * @param objectName Der Name der Datei im Bucket (z.B. der Firebase UID des Users).
-     * @return Eine signierte URL als String.
+     * @param fileUrl the permanent URL of the profile picture object (e.g., retrieved from a database)
+     * @return a temporary signed URL valid for 15 minutes, or the original URL if an error occurs
      */
-    public String generateSignedUrlForProfilePicture(String objectName) {
+    public String generateSignedUrlForProfilePicture(String fileUrl) {
         String BUCKET_NAME = "iris-user-profile-images";
-        BlobInfo blobInfo = BlobInfo.newBuilder(BUCKET_NAME, objectName).build();
-
-        // Definiere die Gültigkeitsdauer der URL (hier: 15 Minuten)
-        long duration = 15;
-        TimeUnit unit = TimeUnit.MINUTES;
-
         try {
-            // Generiere die signierte URL
-            return storage.signUrl(blobInfo, duration, unit, Storage.SignUrlOption.withV4Signature()).toString();
-        } catch (StorageException e) {
-            // Logge den Fehler und wirf eine spezifische Exception für den Controller
-            System.err.println("Error generating signed URL: " + e.getMessage());
-            throw new RuntimeException("Could not generate signed URL for object: " + objectName, e);
+            // Extrahiert den Dateinamen aus der URL
+            String objectName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
+            BlobId blobId = BlobId.of(BUCKET_NAME, objectName);
+            BlobInfo blobInfo = BlobInfo.newBuilder(blobId).build();
+
+            // Generiert eine URL mit V4-Signatur, die 15 Minuten gültig ist
+            URL signedUrl = storage.signUrl(blobInfo, 15, TimeUnit.MINUTES, Storage.SignUrlOption.withV4Signature());
+
+            return signedUrl.toString();
+        } catch (Exception e) {
+            logger.error("Could not generate signed URL for {}", fileUrl, e);
+            // Gibt im Fehlerfall die originale URL zurück, die aber nicht funktionieren wird
+            return fileUrl;
         }
     }
 }

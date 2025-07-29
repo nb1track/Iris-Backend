@@ -224,7 +224,7 @@ public class PhotoService {
      */
     private PhotoResponseDTO toPhotoResponseDTO(Photo photo) {
         User uploader = photo.getUploader();
-        String profileImageUrl = uploader.getProfileImageUrl();
+        String profileImageUrl = gcsStorageService.generateSignedUrlForProfilePicture(uploader.getProfileImageUrl());
 
         // Generate a signed URL for the main photo
         String signedPhotoUrl = gcsStorageService.generateSignedUrl(photo.getStorageUrl());
