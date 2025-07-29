@@ -11,6 +11,7 @@ import com.iris.backend.repository.UserRepository;
 import org.locationtech.jts.geom.Point;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -30,6 +32,7 @@ public class FriendshipService {
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
     private final GcsStorageService gcsStorageService;
+    private final String profileImagesBucketName;
 
     private static final double MAX_DISTANCE_METERS = 50.0; // Max. 50 Meter Entfernung
 
@@ -42,11 +45,15 @@ public class FriendshipService {
     public FriendshipService(
             UserRepository userRepository,
             FriendshipRepository friendshipRepository,
-            @Lazy GcsStorageService gcsStorageService
+            GcsStorageService gcsStorageService,
+            // NEU: Bucket-Namen aus der Konfiguration laden
+            @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName
     ) {
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
         this.gcsStorageService = gcsStorageService;
+        // NEU: Bucket-Namen speichern
+        this.profileImagesBucketName = profileImagesBucketName;
     }
 
 
@@ -280,7 +287,13 @@ public class FriendshipService {
         String objectName = user.getProfileImageUrl();
 
         if (objectName != null && !objectName.isBlank()) {
-            signedProfileUrl = gcsStorageService.generateSignedUrl(objectName);
+            // KORRIGIERTER AUFRUF: Jetzt mit allen vier Parametern
+            signedProfileUrl = gcsStorageService.generateSignedUrl(
+                    this.profileImagesBucketName, // 1. Bucket-Name
+                    objectName,                   // 2. Objekt-Name
+                    15,                           // 3. Dauer
+                    TimeUnit.MINUTES              // 4. Zeiteinheit
+            );
         }
 
         return new UserDTO(user.getId(), user.getUsername(), signedProfileUrl);

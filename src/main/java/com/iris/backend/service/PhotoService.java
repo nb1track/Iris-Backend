@@ -4,10 +4,12 @@ import com.iris.backend.dto.HistoricalPointDTO;
 import com.iris.backend.dto.PhotoResponseDTO;
 import com.iris.backend.model.Photo;
 import com.iris.backend.model.Place;
+import com.iris.backend.model.TimelineEntry;
 import com.iris.backend.model.User;
 import com.iris.backend.model.enums.PhotoVisibility;
 import com.iris.backend.repository.PhotoRepository;
 import com.iris.backend.repository.PlaceRepository;
+import com.iris.backend.repository.TimelineEntryRepository;
 import com.iris.backend.repository.UserRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,9 +39,10 @@ public class PhotoService {
     private final FriendshipService friendshipService;
     private final GcsStorageService gcsStorageService;
     private final UserRepository userRepository;
+    private final TimelineEntryRepository timelineEntryRepository;
+
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
-    // NEU: Bucket-Namen aus der Konfiguration injizieren
     private final String photosBucketName;
     private final String profileImagesBucketName;
 
@@ -49,8 +52,8 @@ public class PhotoService {
             PlaceRepository placeRepository,
             GcsStorageService gcsStorageService,
             UserRepository userRepository,
+            TimelineEntryRepository timelineEntryRepository,
             @Lazy FriendshipService friendshipService,
-            // NEU: Die Bucket-Namen werden hier übergeben
             @Value("${gcs.bucket.photos.name}") String photosBucketName,
             @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName
     ) {
@@ -59,19 +62,18 @@ public class PhotoService {
         this.placeRepository = placeRepository;
         this.gcsStorageService = gcsStorageService;
         this.userRepository = userRepository;
+        this.timelineEntryRepository = timelineEntryRepository;
         this.friendshipService = friendshipService;
-        // NEU: Die Bucket-Namen speichern
         this.photosBucketName = photosBucketName;
         this.profileImagesBucketName = profileImagesBucketName;
     }
 
     @Transactional
-    public UUID createPhoto(MultipartFile file, double latitude, double longitude, PhotoVisibility visibility, Long placeId, User uploader) {
+    public UUID createPhoto(MultipartFile file, double latitude, double longitude, PhotoVisibility visibility, Long placeId, User uploader, List<UUID> friendIds) {
         try {
             Place selectedPlace = placeRepository.findById(placeId)
                     .orElseThrow(() -> new RuntimeException("Place with ID " + placeId + " not found."));
 
-            // GEÄNDERT: Ruft die neue, spezifische Upload-Methode auf
             String objectName = gcsStorageService.uploadPhoto(file);
             Point location = geometryFactory.createPoint(new Coordinate(longitude, latitude));
 
@@ -80,7 +82,6 @@ public class PhotoService {
             newPhoto.setUploader(uploader);
             newPhoto.setLocation(location);
             newPhoto.setVisibility(visibility);
-            // GEÄNDERT: Speichert nur noch den Objektnamen, nicht die ganze URL
             newPhoto.setStorageUrl(objectName);
 
             OffsetDateTime now = OffsetDateTime.now();
@@ -92,6 +93,17 @@ public class PhotoService {
             }
 
             Photo savedPhoto = photoRepository.save(newPhoto);
+
+            if (visibility == PhotoVisibility.FRIENDS && friendIds != null && !friendIds.isEmpty()) {
+                List<User> targetFriends = userRepository.findAllById(friendIds);
+                for (User friend : targetFriends) {
+                    TimelineEntry newEntry = new TimelineEntry();
+                    newEntry.setUser(friend);
+                    newEntry.setPhoto(savedPhoto);
+                    timelineEntryRepository.save(newEntry);
+                }
+            }
+
             return savedPhoto.getId();
         } catch (IOException e) {
             throw new RuntimeException("Could not upload file: " + e.getMessage());
@@ -107,9 +119,7 @@ public class PhotoService {
             throw new SecurityException("User is not authorized to delete this photo.");
         }
 
-        // GEÄNDERT: Ruft die neue deleteFile-Methode mit Bucket- und Objektnamen auf
         gcsStorageService.deleteFile(photosBucketName, photo.getStorageUrl());
-
         photoRepository.delete(photo);
     }
 
@@ -125,7 +135,7 @@ public class PhotoService {
                         OffsetDateTime.now()
                 );
         return photos.stream()
-                .map(this::toPhotoResponseDTO) // Nutzt die zentrale Hilfsmethode
+                .map(this::toPhotoResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -138,24 +148,16 @@ public class PhotoService {
             String historyJson = objectMapper.writeValueAsString(history);
             List<Photo> photos = photoRepository.findPhotosForPlaceMatchingHistoricalBatch(placeId, historyJson);
             return photos.stream()
-                    .map(this::toPhotoResponseDTO) // Nutzt die zentrale Hilfsmethode
+                    .map(this::toPhotoResponseDTO)
                     .collect(Collectors.toList());
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing historical photo data", e);
         }
     }
 
-    /**
-     * Die zentrale Hilfsmethode.
-     * Konvertiert eine Photo-Entität in ein DTO und generiert signierte URLs
-     * für das Hauptfoto UND das Profilbild des Uploaders.
-     *
-     * WIRD JETZT PUBLIC, damit andere Services sie nutzen können.
-     */
-    public PhotoResponseDTO toPhotoResponseDTO(Photo photo) { // <--- von private zu public ändern
+    public PhotoResponseDTO toPhotoResponseDTO(Photo photo) {
         User uploader = photo.getUploader();
 
-        // 1. Signierte URL für das Hauptfoto generieren (z.B. 1 Stunde gültig)
         String signedPhotoUrl = gcsStorageService.generateSignedUrl(
                 photosBucketName,
                 photo.getStorageUrl(),
@@ -163,7 +165,6 @@ public class PhotoService {
                 TimeUnit.MINUTES
         );
 
-        // 2. Signierte URL für das Profilbild des Uploaders generieren (z.B. 1 Stunde gültig)
         String signedProfileImageUrl = gcsStorageService.generateSignedUrl(
                 profileImagesBucketName,
                 uploader.getProfileImageUrl(),
