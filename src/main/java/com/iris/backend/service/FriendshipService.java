@@ -11,6 +11,7 @@ import com.iris.backend.repository.UserRepository;
 import org.locationtech.jts.geom.Point;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,11 +39,16 @@ public class FriendshipService {
      * @param userRepository the repository used for accessing and managing User entities
      * @param friendshipRepository the repository used for accessing and managing Friendship entities
      */
-    public FriendshipService(UserRepository userRepository, FriendshipRepository friendshipRepository, GcsStorageService gcsStorageService) {
+    public FriendshipService(
+            UserRepository userRepository,
+            FriendshipRepository friendshipRepository,
+            @Lazy GcsStorageService gcsStorageService
+    ) {
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
         this.gcsStorageService = gcsStorageService;
     }
+
 
     /**
      * Retrieves the list of friends for a specified user as Data Transfer Object (DTO) representations.
