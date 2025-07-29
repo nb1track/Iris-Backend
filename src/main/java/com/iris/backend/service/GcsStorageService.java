@@ -107,13 +107,27 @@ public class GcsStorageService {
         if (objectName == null || objectName.isBlank()) {
             return null;
         }
+
+        // --- HIER IST DIE WICHTIGE ABSICHERUNG ---
+        // Wenn der objectName eine volle URL ist, extrahieren wir nur den Dateinamen.
+        // Das macht den Code robust gegenüber alten, falsch gespeicherten Daten.
+        String finalObjectName = objectName;
+        if (objectName.startsWith("http")) {
+            try {
+                finalObjectName = objectName.substring(objectName.lastIndexOf('/') + 1);
+            } catch (Exception e) {
+                logger.error("Could not parse object name from full URL: {}", objectName);
+                return null; // Im Fehlerfall abbrechen
+            }
+        }
+
         try {
-            BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, objectName)).build();
+            BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, finalObjectName)).build();
             URL signedUrl = storage.signUrl(blobInfo, duration, timeUnit, Storage.SignUrlOption.withV4Signature());
             return signedUrl.toExternalForm();
         } catch (Exception e) {
-            logger.error("Could not generate signed URL for object {} in bucket {}: {}", objectName, bucketName, e.getMessage());
-            return null; // Im Fehlerfall null zurückgeben
+            logger.error("Could not generate signed URL for object {} in bucket {}: {}", finalObjectName, bucketName, e.getMessage());
+            return null;
         }
     }
 }
