@@ -157,7 +157,8 @@ public class PhotoService {
                         photo.getPlace().getId().intValue(),
                         photo.getPlace().getName(),
                         photo.getUploader().getId(),
-                        photo.getUploader().getUsername()
+                        photo.getUploader().getUsername(),
+                        photo.getUploader().getProfileImageUrl()
                 ))
                 .collect(Collectors.toList());
     }
@@ -221,7 +222,8 @@ public class PhotoService {
                             photo.getPlace().getId().intValue(),
                             photo.getPlace().getName(),
                             photo.getUploader().getId(),
-                            photo.getUploader().getUsername()
+                            photo.getUploader().getUsername(),
+                            photo.getUploader().getProfileImageUrl()
                     ))
                     .collect(Collectors.toList());
 

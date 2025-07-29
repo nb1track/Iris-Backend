@@ -41,7 +41,8 @@ public class TimelineService {
                             photo.getPlace().getId().intValue(),
                             photo.getPlace().getName(),
                             photo.getUploader().getId(),
-                            photo.getUploader().getUsername()
+                            photo.getUploader().getUsername(),
+                            photo.getUploader().getProfileImageUrl()
                     );
                 })
                 .collect(Collectors.toList());

@@ -90,7 +90,8 @@ public class FeedService {
                                             photo.getPlace().getId().intValue(),
                                             photo.getPlace().getName(),
                                             photo.getUploader().getId(),
-                                            photo.getUploader().getUsername()
+                                            photo.getUploader().getUsername(),
+                                            photo.getUploader().getProfileImageUrl()
                                     ),
                                     Collectors.toList()
                             )

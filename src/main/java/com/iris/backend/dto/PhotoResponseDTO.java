@@ -23,5 +23,6 @@ public record PhotoResponseDTO(
         int placeId,
         String placeName,
         UUID userId,
-        String username
+        String username,
+        String profileImageUrl
 ) {}
