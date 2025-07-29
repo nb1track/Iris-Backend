@@ -149,8 +149,10 @@ public class PhotoService {
      * Die zentrale Hilfsmethode.
      * Konvertiert eine Photo-Entität in ein DTO und generiert signierte URLs
      * für das Hauptfoto UND das Profilbild des Uploaders.
+     *
+     * WIRD JETZT PUBLIC, damit andere Services sie nutzen können.
      */
-    private PhotoResponseDTO toPhotoResponseDTO(Photo photo) {
+    public PhotoResponseDTO toPhotoResponseDTO(Photo photo) { // <--- von private zu public ändern
         User uploader = photo.getUploader();
 
         // 1. Signierte URL für das Hauptfoto generieren (z.B. 1 Stunde gültig)

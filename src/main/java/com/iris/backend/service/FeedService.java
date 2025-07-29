@@ -19,14 +19,20 @@ public class FeedService {
 
     private final FeedRepository feedRepository;
     private final ObjectMapper objectMapper;
-    private final GoogleApiService googleApiService; // NEU: Google Service für die Dichte-Prüfung
-    private final GcsStorageService gcsStorageService;
+    private final GoogleApiService googleApiService;
+    // NEU: Wir injizieren den PhotoService, um seine Konvertierungslogik zu nutzen
+    private final PhotoService photoService;
 
-    public FeedService(FeedRepository feedRepository, ObjectMapper objectMapper, GoogleApiService googleApiService, GcsStorageService gcsStorageService) {
+    public FeedService(
+            FeedRepository feedRepository,
+            ObjectMapper objectMapper,
+            GoogleApiService googleApiService,
+            PhotoService photoService // NEU: PhotoService hier hinzufügen
+    ) {
         this.feedRepository = feedRepository;
         this.objectMapper = objectMapper;
-        this.googleApiService = googleApiService; // NEU
-        this.gcsStorageService = gcsStorageService;
+        this.googleApiService = googleApiService;
+        this.photoService = photoService; // NEU
     }
 
     /**
@@ -50,7 +56,7 @@ public class FeedService {
             return List.of();
         }
 
-        // ... (deine Logik für den adaptiven Radius bleibt unverändert)
+        // Deine Logik für den adaptiven Radius bleibt unverändert
         HistoricalPointDTO latestPoint = history.get(history.size() - 1);
         List<PlaceDTO> nearbyPlacesSample = googleApiService.findNearbyPlaces(latestPoint.latitude(), latestPoint.longitude());
         double adaptiveRadius;
@@ -62,7 +68,6 @@ public class FeedService {
             adaptiveRadius = 300;
         }
         System.out.println("ADAPTIVE RADIUS SET TO: " + adaptiveRadius + "m based on " + nearbyPlacesSample.size() + " nearby places.");
-        // ---
 
         try {
             String historyJson = objectMapper.writeValueAsString(history);
@@ -70,8 +75,7 @@ public class FeedService {
 
             // Gruppiere die gefundenen Fotos nach ihrem Ort (Place)
             Map<PlaceDTO, List<PhotoResponseDTO>> groupedByPlace = photos.stream()
-                    // ===== KORREKTUR: Füge diese Filterzeile hinzu =====
-                    .filter(photo -> photo.getPlace() != null) // Verhindert die NullPointerException
+                    .filter(photo -> photo.getPlace() != null) // Wichtiger Schutz vor NullPointerExceptions
                     .collect(Collectors.groupingBy(
                             // Schlüssel für die Gruppierung: das PlaceDTO des Fotos
                             photo -> new PlaceDTO(
@@ -82,17 +86,9 @@ public class FeedService {
                                     null // Foto-Liste ist hier noch nicht relevant
                             ),
                             // Werte: eine Liste der PhotoResponseDTOs für jeden Ort
+                            // KORRIGIERT: Wir verwenden jetzt die wiederverwendbare Methode aus dem PhotoService
                             Collectors.mapping(
-                                    photo -> new PhotoResponseDTO(
-                                            photo.getId(),
-                                            gcsStorageService.generateSignedUrl(photo.getStorageUrl()),
-                                            photo.getUploadedAt(),
-                                            photo.getPlace().getId().intValue(),
-                                            photo.getPlace().getName(),
-                                            photo.getUploader().getId(),
-                                            photo.getUploader().getUsername(),
-                                            photo.getUploader().getProfileImageUrl()
-                                    ),
+                                    photoService::toPhotoResponseDTO, // VIEL SAUBERER!
                                     Collectors.toList()
                             )
                     ));
