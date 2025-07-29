@@ -28,6 +28,8 @@ public class FriendshipService {
 
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
+    private final GcsStorageService gcsStorageService;
+
     private static final double MAX_DISTANCE_METERS = 50.0; // Max. 50 Meter Entfernung
 
     /**
@@ -36,9 +38,10 @@ public class FriendshipService {
      * @param userRepository the repository used for accessing and managing User entities
      * @param friendshipRepository the repository used for accessing and managing Friendship entities
      */
-    public FriendshipService(UserRepository userRepository, FriendshipRepository friendshipRepository) {
+    public FriendshipService(UserRepository userRepository, FriendshipRepository friendshipRepository, GcsStorageService gcsStorageService) {
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
+        this.gcsStorageService = gcsStorageService;
     }
 
     /**
@@ -62,7 +65,7 @@ public class FriendshipService {
         return friendships.stream()
                 .map(friendship -> {
                     User friend = friendship.getUserOne().getId().equals(userId) ? friendship.getUserTwo() : friendship.getUserOne();
-                    return new UserDTO(friend.getId(), friend.getUsername());
+                    return new UserDTO(friend.getId(), friend.getUsername(), friend.getProfileImageUrl());
                 })
                 .collect(Collectors.toList());
     }
@@ -234,36 +237,43 @@ public class FriendshipService {
      * @return A list of UserDTOs representing the user's nearby friends at the specified location within the defined radius.
      *         Returns an empty list if no friends are nearby or available.
      */
+    /**
+     * Findet Freunde in der Nähe eines Ortes und gibt sie als DTOs zurück,
+     * inklusive einer signierten URL für ihr Profilbild.
+     */
     @Transactional(readOnly = true)
     public List<UserDTO> findNearbyFriendsAtPlace(User currentUser, Point placeLocation) {
-        // --- NEUE, WICHTIGE PRÜFUNG ---
-        // Wenn der Ort keine Koordinaten hat, können wir keine nahen Freunde finden.
         if (placeLocation == null) {
-            logger.warn("--- [findNearbyFriendsAtPlace] placeLocation is null. Cannot search for friends. Place might be missing coordinates.");
-            return List.of(); // Gib eine leere Liste zurück, anstatt abzustürzen.
+            return List.of(); // Sicherstellen, dass nichts passiert, wenn der Ort keine Koordinaten hat
         }
-        // --- ENDE NEUE PRÜFUNG ---
 
-        // 1. Hole die IDs aller akzeptierten Freunde
+        // 1. IDs aller Freunde holen
         List<UUID> friendIds = getFriendsAsEntities(currentUser.getId()).stream()
                 .map(User::getId)
                 .collect(Collectors.toList());
 
         if (friendIds.isEmpty()) {
-            return List.of();
+            return List.of(); // Wenn keine Freunde, dann keine Freunde in der Nähe
         }
 
-        // 2. Definiere den Radius
-        double radius = 100.0; // 100 Meter
+        double radius = 100.0; // 100 Meter Radius
 
-        // 3. Finde Freunde innerhalb des Radius
-        List<User> nearbyFriends = userRepository.findFriendsByIdsWithinRadius(friendIds, placeLocation, radius);
+        // 2. Rufe die neue, saubere Repository-Methode auf
+        List<User> nearbyFriends = userRepository.findFriendsByIdsAndLocation(friendIds, placeLocation, radius);
 
-        // 4. Filtere zusätzlich nach der Zeit
+        // 3. Filtere nach Zeit und wandle in DTOs um (inkl. Profilbild-URL)
         return nearbyFriends.stream()
                 .filter(friend -> friend.getLastLocationUpdatedAt() != null &&
                         Duration.between(friend.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes() <= 5)
-                .map(friend -> new UserDTO(friend.getId(), friend.getUsername()))
+                .map(friend -> {
+                    String signedUrl = null;
+                    // Nur eine URL generieren, wenn der Freund ein Profilbild hat
+                    if (friend.getProfileImageUrl() != null && !friend.getProfileImageUrl().isEmpty()) {
+                        signedUrl = gcsStorageService.generateSignedUrlForProfilePicture(friend.getFirebaseUid());
+                    }
+                    // Erstelle das DTO mit allen drei benötigten Informationen
+                    return new UserDTO(friend.getId(), friend.getUsername(), signedUrl);
+                })
                 .collect(Collectors.toList());
     }
 }
