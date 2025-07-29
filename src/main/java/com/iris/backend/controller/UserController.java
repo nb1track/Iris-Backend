@@ -102,7 +102,7 @@ public class UserController {
         try {
             FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
             User newUser = userService.registerNewUser(decodedToken, signUpRequest.username(), signUpRequest.base64Image());
-            UserDTO userDTO = new UserDTO(newUser.getId(), newUser.getUsername());
+            UserDTO userDTO = new UserDTO(newUser.getId(), newUser.getUsername(), newUser.getProfileImageUrl());
             return ResponseEntity.status(HttpStatus.CREATED).body(userDTO);
 
         } catch (FirebaseAuthException e) {
