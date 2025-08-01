@@ -131,4 +131,28 @@ public class FriendshipController {
         List<UserDTO> nearbyFriends = friendshipService.findNearbyFriendsAtPlace(currentUser, place.getLocation());
         return ResponseEntity.ok(nearbyFriends);
     }
+
+    /**
+     * Handles rejecting a pending friendship request.
+     * The entire friendship entry is deleted from the database.
+     *
+     * @param currentUser The currently authenticated user rejecting the request.
+     * @param request The DTO containing the ID of the friendship to be rejected.
+     * @return A ResponseEntity indicating success or failure.
+     */
+    @PostMapping("/reject")
+    public ResponseEntity<String> rejectFriendRequest(
+            @AuthenticationPrincipal User currentUser,
+            @RequestBody FriendshipActionDTO request) { // Wir können das gleiche DTO wie für "accept" wiederverwenden
+        try {
+            friendshipService.rejectFriendRequest(request.friendshipId(), currentUser);
+            return ResponseEntity.ok("Friendship request rejected and deleted.");
+        } catch (SecurityException e) {
+            // Wenn der User nicht berechtigt ist, die Anfrage abzulehnen
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (RuntimeException e) {
+            // Wenn die Freundschaftsanfrage nicht gefunden wurde
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
 }

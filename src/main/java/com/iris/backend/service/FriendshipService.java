@@ -324,4 +324,37 @@ public class FriendshipService {
 
         return new UserDTO(user.getId(), user.getUsername(), signedProfileUrl);
     }
+
+    /**
+     * Rejects a friend request by deleting the friendship entry from the database.
+     *
+     * A security check ensures that only a user involved in the friendship
+     * (specifically the one who did NOT send the request) can reject it.
+     *
+     * @param friendshipId The ID of the friendship request to be rejected.
+     * @param currentUser The user attempting to reject the request.
+     * @throws RuntimeException if the friendship is not found.
+     * @throws SecurityException if the user is not authorized to reject the request.
+     */
+    @Transactional
+    public void rejectFriendRequest(UUID friendshipId, User currentUser) {
+        // 1. Finde die Freundschaftsanfrage in der Datenbank
+        Friendship friendship = friendshipRepository.findById(friendshipId)
+                .orElseThrow(() -> new RuntimeException("Friendship request not found with ID: " + friendshipId));
+
+        // 2. Sicherheits-Check: Darf der aktuelle Benutzer diese Anfrage ablehnen?
+        // Nur der Empfänger der Anfrage darf sie ablehnen. Der Empfänger ist derjenige,
+        // der NICHT der 'actionUser' (der Absender) ist.
+        if (friendship.getActionUser().getId().equals(currentUser.getId())) {
+            throw new SecurityException("You cannot reject a friend request you sent yourself.");
+        }
+        // Zusätzlicher Check: Ist der User überhaupt Teil dieser Freundschaft?
+        if (!friendship.getUserOne().getId().equals(currentUser.getId()) && !friendship.getUserTwo().getId().equals(currentUser.getId())) {
+            throw new SecurityException("You are not part of this friendship request.");
+        }
+
+        // 3. Wenn alle Checks bestanden sind, lösche den Eintrag komplett.
+        friendshipRepository.deleteById(friendshipId);
+        logger.info("--- [rejectFriendRequest] Successfully deleted friendship request with ID: {}", friendshipId);
+    }
 }
