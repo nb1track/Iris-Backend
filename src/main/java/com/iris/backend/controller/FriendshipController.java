@@ -11,6 +11,8 @@ import com.iris.backend.service.FriendshipService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.UUID;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.HttpStatus;
 
@@ -154,5 +156,21 @@ public class FriendshipController {
             // Wenn die Freundschaftsanfrage nicht gefunden wurde
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
+    }
+
+    /**
+     * Removes a friend from the current user's friend list.
+     *
+     * @param currentUser The authenticated user.
+     * @param friendId The UUID of the friend to be removed.
+     * @return A ResponseEntity indicating success.
+     */
+    @DeleteMapping("/{friendId}")
+    public ResponseEntity<Void> removeFriend(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable UUID friendId) {
+
+        friendshipService.removeFriend(currentUser, friendId);
+        return ResponseEntity.noContent().build(); // HTTP 204 No Content ist der Standard für erfolgreiche DELETE-Anfragen
     }
 }
