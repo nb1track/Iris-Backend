@@ -8,7 +8,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.iris.backend.dto.CreatePlaceRequestDTO;
+import com.iris.backend.model.User;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.PrecisionModel;
+import java.util.UUID;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.time.OffsetDateTime;
@@ -19,6 +25,7 @@ public class PlaceService {
 
     private final PlaceRepository placeRepository;
     private final ObjectMapper objectMapper;
+    private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
 
     /**
@@ -101,4 +108,41 @@ public class PlaceService {
                 ))
                 .collect(Collectors.toList());
     }
+
+    /**
+     * Creates and saves a new custom place.
+     *
+     * @param request The DTO with the place details.
+     * @param creator The user who is creating the place.
+     * @return A DTO representation of the newly saved place.
+     */
+    @Transactional
+    public PlaceDTO createCustomPlace(CreatePlaceRequestDTO request, User creator) {
+        Place newPlace = new Place();
+
+        newPlace.setName(request.name());
+
+        // Da dies kein Google Place ist, generieren wir eine eigene, einzigartige ID,
+        // um Konflikte zu vermeiden.
+        newPlace.setGooglePlaceId("custom_" + UUID.randomUUID().toString());
+
+        // Erstelle einen PostGIS-Punkt aus den Koordinaten
+        Point location = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
+        newPlace.setLocation(location);
+
+        // Die Adresse lassen wir bei benutzerdefinierten Orten erstmal weg
+        newPlace.setAddress("Custom Location");
+
+        Place savedPlace = placeRepository.save(newPlace);
+
+        // Wandle die gespeicherte Entität in ein DTO um und gib sie zurück
+        return new PlaceDTO(
+                savedPlace.getId(),
+                savedPlace.getGooglePlaceId(),
+                savedPlace.getName(),
+                savedPlace.getAddress(),
+                null // Ein neuer Ort hat noch keine Fotos
+        );
+    }
+
 }

@@ -5,8 +5,14 @@ import com.iris.backend.dto.PhotoResponseDTO;
 import com.iris.backend.dto.PlaceDTO;
 import com.iris.backend.service.GoogleApiService;
 import com.iris.backend.service.PhotoService;
+import com.iris.backend.service.PlaceService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.iris.backend.dto.CreatePlaceRequestDTO;
+import com.iris.backend.model.User;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 
@@ -17,6 +23,8 @@ public class PlaceController {
 
     private final GoogleApiService googleApiService;
     private final PhotoService photoService;
+    private final PlaceService placeService;
+
 
     /**
      * Constructs a new PlaceController with the provided GoogleApiService and PhotoService.
@@ -24,9 +32,10 @@ public class PlaceController {
      * @param googleApiService the service used to handle interactions with the Google API
      * @param photoService the service used to handle photo-related operations
      */
-    public PlaceController(GoogleApiService googleApiService,  PhotoService photoService) {
+    public PlaceController(GoogleApiService googleApiService,  PhotoService photoService, PlaceService placeService) {
         this.googleApiService = googleApiService;
         this.photoService = photoService;
+        this.placeService = placeService;
     }
 
     /**
@@ -63,5 +72,24 @@ public class PlaceController {
                 searchRequest.history()
         );
         return ResponseEntity.ok(photos);
+    }
+
+    /**
+     * Creates a new custom place based on user input.
+     *
+     * @param currentUser The authenticated user creating the place.
+     * @param request The DTO containing the name and coordinates of the new place.
+     * @return A ResponseEntity with the newly created PlaceDTO and HTTP status 201 (Created).
+     */
+    @PostMapping("/custom")
+    public ResponseEntity<PlaceDTO> createCustomPlace(
+            @AuthenticationPrincipal User currentUser,
+            @RequestBody @Valid CreatePlaceRequestDTO request) {
+
+        // Wir übergeben die Anfrage an den Service, der die Logik enthält
+        PlaceDTO newPlace = placeService.createCustomPlace(request, currentUser);
+
+        // Wir geben den neu erstellten Ort an das Frontend zurück
+        return ResponseEntity.status(HttpStatus.CREATED).body(newPlace);
     }
 }
