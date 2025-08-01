@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.slf4j.Logger; // NEU
 import org.slf4j.LoggerFactory; // NEU
-
 import java.util.List;
 
 
@@ -147,5 +146,18 @@ public class UserController {
         );
 
         return ResponseEntity.ok(nearbyUsers);
+    }
+
+    /**
+     * Retrieves the profile information for the currently authenticated user.
+     *
+     * @param currentUser The user object, automatically injected by Spring Security from the auth token.
+     * @return A ResponseEntity containing the UserDTO with the user's ID, username, and signed profile image URL.
+     */
+    @GetMapping("/me")
+    public ResponseEntity<UserDTO> getCurrentUserProfile(@AuthenticationPrincipal User currentUser) {
+        // Wir übergeben den User direkt an den Service, der ihn in ein DTO umwandelt.
+        UserDTO userProfile = userService.getUserProfile(currentUser);
+        return ResponseEntity.ok(userProfile);
     }
 }

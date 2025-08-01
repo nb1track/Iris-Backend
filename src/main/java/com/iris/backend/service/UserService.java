@@ -212,4 +212,34 @@ public class UserService {
                 })
                 .collect(Collectors.toList());
     }
+
+    /**
+     * Converts a User entity into a UserDTO for profile display.
+     * It generates a fresh signed URL for the user's profile picture.
+     *
+     * @param currentUser The User entity to be converted.
+     * @return A UserDTO containing public-facing profile information.
+     */
+    public UserDTO getUserProfile(User currentUser) {
+        String signedProfileUrl = null;
+        String objectName = currentUser.getProfileImageUrl();
+
+        // Prüfe, ob der User überhaupt ein Profilbild hat
+        if (objectName != null && !objectName.isBlank()) {
+            // Generiere eine neue, temporär gültige URL
+            signedProfileUrl = gcsStorageService.generateSignedUrl(
+                    this.profileImagesBucketName, // Der korrekte Bucket-Name
+                    objectName,                   // Der in der DB gespeicherte Dateiname
+                    15,                           // Gültigkeitsdauer
+                    TimeUnit.MINUTES              // Zeiteinheit
+            );
+        }
+
+        // Erstelle und gib das DTO zurück
+        return new UserDTO(
+                currentUser.getId(),
+                currentUser.getUsername(),
+                signedProfileUrl // Entweder die URL oder null
+        );
+    }
 }
