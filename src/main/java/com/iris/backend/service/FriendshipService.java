@@ -220,21 +220,47 @@ public class FriendshipService {
      * @param currentUser The user for whom pending requests are to be retrieved.
      * @return A list of PendingRequestDTO objects representing the pending friend requests.
      */
+    /**
+     * Retrieves a list of pending friend requests for the specified user.
+     * The DTO now includes the sender's profile picture URL.
+     *
+     * @param currentUser The user for whom pending requests are to be retrieved.
+     * @return A list of PendingRequestDTO objects.
+     */
     @Transactional(readOnly = true)
     public List<PendingRequestDTO> getPendingRequests(User currentUser) {
-        // HIER WERDEN DEINE NEUEN METHODEN JETZT VERWENDET
+        // Die Logik zum Holen der Anfragen bleibt gleich
         List<Friendship> requestsAsUserOne = friendshipRepository
                 .findByUserOneAndStatusAndActionUserNot(currentUser, FriendshipStatus.PENDING, currentUser);
 
         List<Friendship> requestsAsUserTwo = friendshipRepository
                 .findByUserTwoAndStatusAndActionUserNot(currentUser, FriendshipStatus.PENDING, currentUser);
 
-        // Wir führen beide Listen zusammen und wandeln sie in DTOs um.
+        // --- HIER IST DIE WICHTIGE ÄNDERUNG ---
+        // Wir führen beide Listen zusammen und wandeln sie in die neuen DTOs um.
         return Stream.concat(requestsAsUserOne.stream(), requestsAsUserTwo.stream())
-                .map(friendship -> new PendingRequestDTO(
-                        friendship.getId(),
-                        friendship.getActionUser().getUsername()
-                ))
+                .map(friendship -> {
+                    User sender = friendship.getActionUser();
+                    String signedProfileUrl = null;
+
+                    // Nur eine URL generieren, wenn der Absender ein Profilbild hat
+                    if (sender.getProfileImageUrl() != null && !sender.getProfileImageUrl().isBlank()) {
+                        // Rufe die flexible Methode im GCS-Service auf
+                        signedProfileUrl = gcsStorageService.generateSignedUrl(
+                                this.profileImagesBucketName, // 1. Bucket-Name für Profilbilder
+                                sender.getProfileImageUrl(),  // 2. Der Objektname (z.B. die UID.jpg)
+                                15,                           // 3. Gültigkeitsdauer
+                                TimeUnit.MINUTES              // 4. Zeiteinheit
+                        );
+                    }
+
+                    // Erstelle das DTO mit allen drei Informationen
+                    return new PendingRequestDTO(
+                            friendship.getId(),
+                            sender.getUsername(),
+                            signedProfileUrl
+                    );
+                })
                 .collect(Collectors.toList());
     }
 
