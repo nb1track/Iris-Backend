@@ -357,4 +357,28 @@ public class FriendshipService {
         friendshipRepository.deleteById(friendshipId);
         logger.info("--- [rejectFriendRequest] Successfully deleted friendship request with ID: {}", friendshipId);
     }
+
+    /**
+     * Removes a friendship between the current user and another user.
+     *
+     * @param currentUser The user initiating the removal.
+     * @param friendId The ID of the friend to be removed.
+     * @throws RuntimeException if the friend or the friendship is not found.
+     */
+    @Transactional
+    public void removeFriend(User currentUser, UUID friendId) {
+        User friendToRemove = userRepository.findById(friendId)
+                .orElseThrow(() -> new RuntimeException("Friend to remove not found with ID: " + friendId));
+
+        Friendship friendship = friendshipRepository.findFriendshipBetweenUsers(currentUser, friendToRemove)
+                .orElseThrow(() -> new RuntimeException("Friendship not found between users."));
+
+        // Optionaler Check: Ist die Freundschaft überhaupt "ACCEPTED"?
+        if (friendship.getStatus() != FriendshipStatus.ACCEPTED) {
+            throw new IllegalStateException("Cannot remove a friendship that is not accepted.");
+        }
+
+        friendshipRepository.delete(friendship);
+        logger.info("--- [removeFriend] Successfully removed friendship between {} and {}", currentUser.getUsername(), friendToRemove.getUsername());
+    }
 }
