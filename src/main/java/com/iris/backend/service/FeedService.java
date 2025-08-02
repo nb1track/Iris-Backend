@@ -1,9 +1,11 @@
 package com.iris.backend.service;
 
+import com.iris.backend.dto.FeedPlaceDTO;
 import com.iris.backend.dto.HistoricalPointDTO;
 import com.iris.backend.dto.PhotoResponseDTO;
 import com.iris.backend.dto.PlaceDTO;
 import com.iris.backend.model.Photo;
+import com.iris.backend.model.Place;
 import com.iris.backend.repository.FeedRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,7 +53,7 @@ public class FeedService {
      *         input history is null or empty.
      */
     @Transactional(readOnly = true)
-    public List<PlaceDTO> generateHistoricalFeed(List<HistoricalPointDTO> history) {
+    public List<FeedPlaceDTO> generateHistoricalFeed(List<HistoricalPointDTO> history) {
         if (history == null || history.isEmpty()) {
             return List.of();
         }
@@ -71,39 +73,8 @@ public class FeedService {
 
         try {
             String historyJson = objectMapper.writeValueAsString(history);
-            List<Photo> photos = feedRepository.findPhotosMatchingHistoricalBatch(historyJson, adaptiveRadius);
-
-            // Gruppiere die gefundenen Fotos nach ihrem Ort (Place)
-            Map<PlaceDTO, List<PhotoResponseDTO>> groupedByPlace = photos.stream()
-                    .filter(photo -> photo.getPlace() != null) // Wichtiger Schutz vor NullPointerExceptions
-                    .collect(Collectors.groupingBy(
-                            // Schlüssel für die Gruppierung: das PlaceDTO des Fotos
-                            photo -> new PlaceDTO(
-                                    photo.getPlace().getId(),
-                                    photo.getPlace().getGooglePlaceId(),
-                                    photo.getPlace().getName(),
-                                    photo.getPlace().getAddress(),
-                                    null // Foto-Liste ist hier noch nicht relevant
-                            ),
-                            // Werte: eine Liste der PhotoResponseDTOs für jeden Ort
-                            // KORRIGIERT: Wir verwenden jetzt die wiederverwendbare Methode aus dem PhotoService
-                            Collectors.mapping(
-                                    photoService::toPhotoResponseDTO, // VIEL SAUBERER!
-                                    Collectors.toList()
-                            )
-                    ));
-
-            // Wandle die Map in die finale Listenstruktur um
-            return groupedByPlace.entrySet().stream()
-                    .map(entry -> new PlaceDTO(
-                            entry.getKey().id(),
-                            entry.getKey().googlePlaceId(),
-                            entry.getKey().name(),
-                            entry.getKey().address(),
-                            entry.getValue() // Füge die Liste der Fotos hinzu
-                    ))
-                    .collect(Collectors.toList());
-
+            List<FeedPlaceDTO> places = feedRepository.findPlacesWithPhotosMatchingUserHistory(historyJson, adaptiveRadius);
+            return places;
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing historical data", e);
         }
