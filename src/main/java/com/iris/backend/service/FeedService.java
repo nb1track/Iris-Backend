@@ -91,7 +91,7 @@ public class FeedService {
             return rawResults.stream().map(row -> {
                 String signedPhotoUrl = gcsStorageService.generateSignedUrl(
                         photosBucketName,
-                        (String) row[5],  // cast to String to be safe
+                        (String) row[4],  // cast to String to be safe
                         12,
                         TimeUnit.HOURS
                 );
@@ -100,8 +100,8 @@ public class FeedService {
                         (Long) row[0],               // id
                         (String) row[1],             // googlePlaceId
                         (String) row[2],             // name
-                        signedPhotoUrl,              // coverImageUrl (use signed URL here)
-                        toTimestamp(row[4]),         // coverImageDate (fix: signedPhotoUrl is URL, so use row[4] instead)
+                        signedPhotoUrl,              // coverImageUrl
+                        toTimestamp(row[5]),         // coverImageDate
                         toTimestamp(row[6]),         // newestDate
                         ((Number) row[7]).longValue(), // photoCount
                         (String) row[3]              // address
