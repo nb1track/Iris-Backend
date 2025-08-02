@@ -9,6 +9,7 @@ import com.iris.backend.model.Place;
 import com.iris.backend.repository.FeedRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.sql.Timestamp;
 
@@ -27,17 +29,22 @@ public class FeedService {
     private final GoogleApiService googleApiService;
     // NEU: Wir injizieren den PhotoService, um seine Konvertierungslogik zu nutzen
     private final PhotoService photoService;
+    private final GcsStorageService gcsStorageService;
+    private final String photosBucketName;
 
     public FeedService(
             FeedRepository feedRepository,
             ObjectMapper objectMapper,
             GoogleApiService googleApiService,
-            PhotoService photoService // NEU: PhotoService hier hinzufügen
-    ) {
+            PhotoService photoService, // NEU: PhotoService hier hinzufügen
+            GcsStorageService gcsStorageService,
+            @Value("${gcs.bucket.photos.name}") String photosBucketName) {
         this.feedRepository = feedRepository;
         this.objectMapper = objectMapper;
         this.googleApiService = googleApiService;
         this.photoService = photoService; // NEU
+        this.gcsStorageService = gcsStorageService;
+        this.photosBucketName = photosBucketName;
     }
 
     /**
@@ -80,23 +87,26 @@ public class FeedService {
                     historyJson, adaptiveRadius
             );
 
-            for (Object[] row : rawResults) {
-                System.out.println("Row:");
-                for (int i = 0; i < row.length; i++) {
-                    System.out.println("  [" + i + "]: " + row[i] + " (" + (row[i] != null ? row[i].getClass().getSimpleName() : "null") + ")");
-                }
-            }
 
-            return rawResults.stream().map(row -> new FeedPlaceDTO(
-                    (Long) row[0],            // id
-                    (String) row[1],          // googlePlaceId
-                    (String) row[2],          // name
-                    (String) row[4],          // coverImageUrl
-                    toTimestamp(row[5]),       // coverImageDate
-                    toTimestamp(row[6]),       // newestDate
-                    ((Number) row[7]).longValue(), // photoCount
-                    (String) row[3]          // address
-            )).toList();
+            return rawResults.stream().map(row -> {
+                String signedPhotoUrl = gcsStorageService.generateSignedUrl(
+                        photosBucketName,
+                        (String) row[5],  // cast to String to be safe
+                        12,
+                        TimeUnit.HOURS
+                );
+
+                return new FeedPlaceDTO(
+                        (Long) row[0],               // id
+                        (String) row[1],             // googlePlaceId
+                        (String) row[2],             // name
+                        signedPhotoUrl,              // coverImageUrl (use signed URL here)
+                        toTimestamp(row[4]),         // coverImageDate (fix: signedPhotoUrl is URL, so use row[4] instead)
+                        toTimestamp(row[6]),         // newestDate
+                        ((Number) row[7]).longValue(), // photoCount
+                        (String) row[3]              // address
+                );
+            }).toList();
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing historical data", e);
         }
