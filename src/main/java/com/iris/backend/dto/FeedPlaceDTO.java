@@ -1,8 +1,6 @@
 package com.iris.backend.dto;
 
 import java.sql.Timestamp;
-import java.time.OffsetDateTime;
-import java.util.UUID;
 
 /**
  * Represents a data transfer object (DTO) for a specific place.
@@ -19,7 +17,7 @@ import java.util.UUID;
  * - address: The address of the place.
  */
 public record FeedPlaceDTO(
-        UUID id,
+        Long id,
         String googlePlaceId,
         String name,
         String coverImageUrl,

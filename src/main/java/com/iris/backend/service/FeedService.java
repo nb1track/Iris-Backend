@@ -78,9 +78,16 @@ public class FeedService {
             List<Object[]> rawResults = feedRepository.findPlacesWithPhotosMatchingUserHistory(
                     historyJson, adaptiveRadius
             );
+            
+            for (Object[] row : rawResults) {
+                System.out.println("Row:");
+                for (int i = 0; i < row.length; i++) {
+                    System.out.println("  [" + i + "]: " + row[i] + " (" + (row[i] != null ? row[i].getClass().getSimpleName() : "null") + ")");
+                }
+            }
 
             return rawResults.stream().map(row -> new FeedPlaceDTO(
-                    (UUID) row[0],            // id
+                    (Long) row[0],            // id
                     (String) row[1],          // googlePlaceId
                     (String) row[2],          // name
                     (String) row[4],          // coverImageUrl
