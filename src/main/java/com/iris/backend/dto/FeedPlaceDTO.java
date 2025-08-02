@@ -1,6 +1,6 @@
 package com.iris.backend.dto;
 
-import com.google.type.DateTime;
+import java.time.OffsetDateTime;
 
 /**
  * Represents a data transfer object (DTO) for a specific place.
@@ -21,7 +21,8 @@ public record FeedPlaceDTO(
         String googlePlaceId,
         String name,
         String coverImageUrl,
-        DateTime coverImageDate,
-        DateTime newestDate,
+        OffsetDateTime coverImageDate,
+        OffsetDateTime newestDate,
+        long photoCount,
         String address
 ) {}

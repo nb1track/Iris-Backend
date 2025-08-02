@@ -44,7 +44,7 @@ public interface FeedRepository extends JpaRepository<Photo, UUID> {
                  ORDER BY ph1.uploaded_at ASC LIMIT 1) AS coverImageDate,
             
                 MAX(mp.uploaded_at) AS newestDate,
-                COUNT(mp.id) AS photo_count,
+                COUNT(mp.id) AS photoCount,
                 MIN(mp.visit_time) AS visitTime
             
             FROM matching_photos mp
