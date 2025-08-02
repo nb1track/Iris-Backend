@@ -14,7 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import java.sql.Timestamp;
 
 @Service
 public class FeedService {
@@ -73,8 +75,20 @@ public class FeedService {
 
         try {
             String historyJson = objectMapper.writeValueAsString(history);
-            List<FeedPlaceDTO> places = feedRepository.findPlacesWithPhotosMatchingUserHistory(historyJson, adaptiveRadius);
-            return places;
+            List<Object[]> rawResults = feedRepository.findPlacesWithPhotosMatchingUserHistory(
+                    historyJson, adaptiveRadius
+            );
+
+            return rawResults.stream().map(row -> new FeedPlaceDTO(
+                    (UUID) row[0],            // id
+                    (String) row[1],          // googlePlaceId
+                    (String) row[2],          // name
+                    (String) row[4],          // coverImageUrl
+                    (Timestamp) row[5],       // coverImageDate
+                    (Timestamp) row[6],       // newestDate
+                    ((Number) row[7]).longValue(), // photoCount
+                    (String) row[3]          // address
+            )).toList();
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing historical data", e);
         }

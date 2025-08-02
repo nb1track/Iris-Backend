@@ -53,7 +53,7 @@ public interface FeedRepository extends JpaRepository<Photo, UUID> {
             GROUP BY p.id, p.google_place_id, p.name, p.address
             ORDER BY visitTime DESC    
             """, nativeQuery = true)
-    List<FeedPlaceDTO> findPlacesWithPhotosMatchingUserHistory(
+    List<Object[]> findPlacesWithPhotosMatchingUserHistory(
             @Param("historyJson") String historyJson,
             @Param("radiusInMeters") double radiusInMeters
     );
