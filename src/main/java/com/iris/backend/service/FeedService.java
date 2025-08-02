@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -78,7 +79,7 @@ public class FeedService {
             List<Object[]> rawResults = feedRepository.findPlacesWithPhotosMatchingUserHistory(
                     historyJson, adaptiveRadius
             );
-            
+
             for (Object[] row : rawResults) {
                 System.out.println("Row:");
                 for (int i = 0; i < row.length; i++) {
@@ -91,13 +92,24 @@ public class FeedService {
                     (String) row[1],          // googlePlaceId
                     (String) row[2],          // name
                     (String) row[4],          // coverImageUrl
-                    (Timestamp) row[5],       // coverImageDate
-                    (Timestamp) row[6],       // newestDate
+                    toTimestamp(row[5]),       // coverImageDate
+                    toTimestamp(row[6]),       // newestDate
                     ((Number) row[7]).longValue(), // photoCount
                     (String) row[3]          // address
             )).toList();
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing historical data", e);
         }
+    }
+
+    private static Timestamp toTimestamp(Object obj) {
+        if (obj instanceof Instant instant) {
+            return Timestamp.from(instant);
+        } else if (obj instanceof Timestamp ts) {
+            return ts;
+        } else if (obj == null) {
+            return null;
+        }
+        throw new IllegalArgumentException("Cannot convert to Timestamp: " + obj.getClass());
     }
 }
