@@ -55,4 +55,14 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             @Param("historyJson") String historyJson,
             @Param("radiusInMeters") double radiusInMeters
     );
+
+    @Query(value = """
+        SELECT * FROM places p
+        WHERE ST_DWithin(p.location, ST_MakePoint(:longitude, :latitude)::geography, :radiusInMeters)
+        """, nativeQuery = true)
+    List<Place> findPlacesWithinRadius(
+            @Param("latitude") double latitude,
+            @Param("longitude") double longitude,
+            @Param("radiusInMeters") double radiusInMeters
+    );
 }

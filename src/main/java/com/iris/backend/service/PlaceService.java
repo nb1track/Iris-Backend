@@ -16,9 +16,13 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.PrecisionModel;
 import java.util.UUID;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 public class PlaceService {
@@ -26,6 +30,7 @@ public class PlaceService {
     private final PlaceRepository placeRepository;
     private final ObjectMapper objectMapper;
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
+    private final GoogleApiService googleApiService;
 
 
     /**
@@ -38,9 +43,11 @@ public class PlaceService {
      * @param placeRepository the repository used for querying and managing Place entities
      * @param objectMapper the JSON mapper used for processing JSON data
      */
-    public PlaceService(PlaceRepository placeRepository, ObjectMapper objectMapper) {
+    public PlaceService(PlaceRepository placeRepository, ObjectMapper objectMapper, GoogleApiService googleApiService) {
         this.placeRepository = placeRepository;
         this.objectMapper = objectMapper;
+        this.googleApiService = googleApiService;
+
     }
 
     /**
@@ -143,6 +150,45 @@ public class PlaceService {
                 savedPlace.getAddress(),
                 null // Ein neuer Ort hat noch keine Fotos
         );
+    }
+
+    /**
+     * Finds nearby places by combining results from the Google Places API
+     * and our local database (for custom places).
+     *
+     * @return A combined and distinct list of nearby places as DTOs.
+     */
+    public List<PlaceDTO> findNearbyCombinedPlaces(double latitude, double longitude) {
+        // 1. Hole Orte von der Google Places API (wie bisher)
+        List<PlaceDTO> googlePlaces = googleApiService.findNearbyPlaces(latitude, longitude);
+
+        // 2. Hole Orte aus unserer eigenen Datenbank (mit der neuen Repository-Methode)
+        double searchRadius = 200; // z.B. 200 Meter für die lokale Suche
+        List<Place> customPlacesFromDb = placeRepository.findPlacesWithinRadius(latitude, longitude, searchRadius);
+
+        // Wandle unsere DB-Orte auch in DTOs um
+        List<PlaceDTO> customPlaceDTOs = customPlacesFromDb.stream()
+                .map(place -> new PlaceDTO(
+                        place.getId(),
+                        place.getGooglePlaceId(),
+                        place.getName(),
+                        place.getAddress(),
+                        null))
+                .collect(Collectors.toList());
+
+        // 3. Führe beide Listen zusammen und entferne Duplikate
+        // (falls ein Ort von Google auch schon in unserer DB ist)
+        List<PlaceDTO> combinedList = Stream.concat(googlePlaces.stream(), customPlaceDTOs.stream())
+                .filter(distinctByKey(PlaceDTO::googlePlaceId)) // Entfernt Duplikate basierend auf der googlePlaceId
+                .collect(Collectors.toList());
+
+        return combinedList;
+    }
+
+    // Eine kleine Hilfsmethode, um Duplikate aus der Liste zu filtern
+    private static <T> Predicate<T> distinctByKey(Function<? super T, ?> keyExtractor) {
+        java.util.Set<Object> seen = ConcurrentHashMap.newKeySet();
+        return t -> seen.add(keyExtractor.apply(t));
     }
 
 }
