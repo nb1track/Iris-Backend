@@ -50,8 +50,8 @@ public class PlaceController {
             @RequestParam double latitude,
             @RequestParam double longitude) {
 
-        // Rufe die Methode auf, die jetzt wieder eine Liste zurückgibt
-        List<PlaceDTO> nearbyPlaces = googleApiService.findNearbyPlaces(latitude, longitude);
+        // Rufe die neue Methode auf, die beide Quellen durchsucht
+        List<PlaceDTO> nearbyPlaces = placeService.findNearbyCombinedPlaces(latitude, longitude);
         return ResponseEntity.ok(nearbyPlaces);
     }
 
