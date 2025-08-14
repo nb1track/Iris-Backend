@@ -1,5 +1,6 @@
 package com.iris.backend.controller;
 
+import com.iris.backend.dto.FeedPlaceDTO;
 import com.iris.backend.dto.HistoricalSearchRequestDTO;
 import com.iris.backend.dto.PlaceDTO;
 import com.iris.backend.service.FeedService;
@@ -22,10 +23,10 @@ public class FeedController {
     }
 
     @PostMapping("/historical")
-    public ResponseEntity<List<PlaceDTO>> getHistoricalFeed(
+    public ResponseEntity<List<FeedPlaceDTO>> getHistoricalFeed(
             @RequestBody HistoricalSearchRequestDTO searchRequest) {
 
-        List<PlaceDTO> feed = feedService.generateHistoricalFeed(searchRequest.history());
+        List<FeedPlaceDTO> feed = feedService.generateHistoricalFeed(searchRequest.history());
         return ResponseEntity.ok(feed);
     }
 }

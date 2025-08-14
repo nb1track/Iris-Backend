@@ -1,18 +1,25 @@
 package com.iris.backend.service;
 
+import com.iris.backend.dto.FeedPlaceDTO;
 import com.iris.backend.dto.HistoricalPointDTO;
 import com.iris.backend.dto.PhotoResponseDTO;
 import com.iris.backend.dto.PlaceDTO;
 import com.iris.backend.model.Photo;
+import com.iris.backend.model.Place;
 import com.iris.backend.repository.FeedRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.sql.Timestamp;
 
 @Service
 public class FeedService {
@@ -22,17 +29,22 @@ public class FeedService {
     private final GoogleApiService googleApiService;
     // NEU: Wir injizieren den PhotoService, um seine Konvertierungslogik zu nutzen
     private final PhotoService photoService;
+    private final GcsStorageService gcsStorageService;
+    private final String photosBucketName;
 
     public FeedService(
             FeedRepository feedRepository,
             ObjectMapper objectMapper,
             GoogleApiService googleApiService,
-            PhotoService photoService // NEU: PhotoService hier hinzufügen
-    ) {
+            PhotoService photoService, // NEU: PhotoService hier hinzufügen
+            GcsStorageService gcsStorageService,
+            @Value("${gcs.bucket.photos.name}") String photosBucketName) {
         this.feedRepository = feedRepository;
         this.objectMapper = objectMapper;
         this.googleApiService = googleApiService;
         this.photoService = photoService; // NEU
+        this.gcsStorageService = gcsStorageService;
+        this.photosBucketName = photosBucketName;
     }
 
     /**
@@ -51,7 +63,7 @@ public class FeedService {
      *         input history is null or empty.
      */
     @Transactional(readOnly = true)
-    public List<PlaceDTO> generateHistoricalFeed(List<HistoricalPointDTO> history) {
+    public List<FeedPlaceDTO> generateHistoricalFeed(List<HistoricalPointDTO> history) {
         if (history == null || history.isEmpty()) {
             return List.of();
         }
@@ -71,41 +83,43 @@ public class FeedService {
 
         try {
             String historyJson = objectMapper.writeValueAsString(history);
-            List<Photo> photos = feedRepository.findPhotosMatchingHistoricalBatch(historyJson, adaptiveRadius);
+            List<Object[]> rawResults = feedRepository.findPlacesWithPhotosMatchingUserHistory(
+                    historyJson, adaptiveRadius
+            );
 
-            // Gruppiere die gefundenen Fotos nach ihrem Ort (Place)
-            Map<PlaceDTO, List<PhotoResponseDTO>> groupedByPlace = photos.stream()
-                    .filter(photo -> photo.getPlace() != null) // Wichtiger Schutz vor NullPointerExceptions
-                    .collect(Collectors.groupingBy(
-                            // Schlüssel für die Gruppierung: das PlaceDTO des Fotos
-                            photo -> new PlaceDTO(
-                                    photo.getPlace().getId(),
-                                    photo.getPlace().getGooglePlaceId(),
-                                    photo.getPlace().getName(),
-                                    photo.getPlace().getAddress(),
-                                    null // Foto-Liste ist hier noch nicht relevant
-                            ),
-                            // Werte: eine Liste der PhotoResponseDTOs für jeden Ort
-                            // KORRIGIERT: Wir verwenden jetzt die wiederverwendbare Methode aus dem PhotoService
-                            Collectors.mapping(
-                                    photoService::toPhotoResponseDTO, // VIEL SAUBERER!
-                                    Collectors.toList()
-                            )
-                    ));
 
-            // Wandle die Map in die finale Listenstruktur um
-            return groupedByPlace.entrySet().stream()
-                    .map(entry -> new PlaceDTO(
-                            entry.getKey().id(),
-                            entry.getKey().googlePlaceId(),
-                            entry.getKey().name(),
-                            entry.getKey().address(),
-                            entry.getValue() // Füge die Liste der Fotos hinzu
-                    ))
-                    .collect(Collectors.toList());
+            return rawResults.stream().map(row -> {
+                String signedPhotoUrl = gcsStorageService.generateSignedUrl(
+                        photosBucketName,
+                        (String) row[4],  // cast to String to be safe
+                        12,
+                        TimeUnit.HOURS
+                );
 
+                return new FeedPlaceDTO(
+                        (Long) row[0],               // id
+                        (String) row[1],             // googlePlaceId
+                        (String) row[2],             // name
+                        signedPhotoUrl,              // coverImageUrl
+                        toTimestamp(row[5]),         // coverImageDate
+                        toTimestamp(row[6]),         // newestDate
+                        ((Number) row[7]).longValue(), // photoCount
+                        (String) row[3]              // address
+                );
+            }).toList();
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing historical data", e);
         }
+    }
+
+    private static Timestamp toTimestamp(Object obj) {
+        if (obj instanceof Instant instant) {
+            return Timestamp.from(instant);
+        } else if (obj instanceof Timestamp ts) {
+            return ts;
+        } else if (obj == null) {
+            return null;
+        }
+        throw new IllegalArgumentException("Cannot convert to Timestamp: " + obj.getClass());
     }
 }
