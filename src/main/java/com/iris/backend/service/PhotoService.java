@@ -172,12 +172,23 @@ public class PhotoService {
                 TimeUnit.MINUTES
         );
 
+        // Wir holen den Ort und prüfen, ob er existiert.
+        Place place = photo.getPlace();
+        Integer placeId = null;
+        String placeName = "Unknown Location"; // Standardwert, falls kein Ort vorhanden
+
+        // Nur wenn der Ort nicht null ist, lesen wir seine Daten aus.
+        if (place != null) {
+            placeId = place.getId().intValue();
+            placeName = place.getName();
+        }
+
         return new PhotoResponseDTO(
                 photo.getId(),
                 signedPhotoUrl,
                 photo.getUploadedAt(),
-                photo.getPlace().getId().intValue(),
-                photo.getPlace().getName(),
+                placeId,
+                placeName,
                 uploader.getId(),
                 uploader.getUsername(),
                 signedProfileImageUrl
