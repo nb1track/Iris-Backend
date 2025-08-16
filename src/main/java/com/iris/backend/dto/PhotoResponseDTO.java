@@ -20,7 +20,7 @@ public record PhotoResponseDTO(
         UUID photoId,
         String storageUrl,
         OffsetDateTime timestamp,
-        int placeId,
+        Integer placeId,
         String placeName,
         UUID userId,
         String username,

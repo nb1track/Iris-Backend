@@ -155,6 +155,13 @@ public class PhotoService {
         }
     }
 
+    /**
+     * Converts a Photo entity to a PhotoResponseDTO with additional computed fields
+     * such as signed URLs for the photo and uploader's profile image.
+     *
+     * @param photo the Photo entity to be converted
+     * @return a PhotoResponseDTO containing the photo's details and additional data such as signed URLs
+     */
     public PhotoResponseDTO toPhotoResponseDTO(Photo photo) {
         User uploader = photo.getUploader();
 
@@ -172,16 +179,16 @@ public class PhotoService {
                 TimeUnit.MINUTES
         );
 
-        // Wir holen den Ort und prüfen, ob er existiert.
         Place place = photo.getPlace();
         Integer placeId = null;
-        String placeName = "Unknown Location"; // Standardwert, falls kein Ort vorhanden
+        String placeName = "Unknown Location";
 
-        // Nur wenn der Ort nicht null ist, lesen wir seine Daten aus.
         if (place != null) {
+            // Wir holen uns die ID als Long und konvertieren sie sicher zu Integer
             placeId = place.getId().intValue();
             placeName = place.getName();
         }
+
 
         return new PhotoResponseDTO(
                 photo.getId(),
