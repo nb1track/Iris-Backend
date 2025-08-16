@@ -17,10 +17,12 @@ public class TimelineService {
 
     private final TimelineEntryRepository timelineEntryRepository;
     private final PhotoRepository photoRepository;
+    private final PhotoService photoService;
 
-    public TimelineService(TimelineEntryRepository timelineEntryRepository, PhotoRepository photoRepository) {
+    public TimelineService(TimelineEntryRepository timelineEntryRepository, PhotoRepository photoRepository, PhotoService photoService) {
         this.timelineEntryRepository = timelineEntryRepository;
         this.photoRepository = photoRepository;
+        this.photoService = photoService;
     }
 
     @Transactional(readOnly = true)
@@ -28,23 +30,11 @@ public class TimelineService {
         // 1. Finde alle Timeline-Einträge für den Benutzer
         List<TimelineEntry> timelineEntries = timelineEntryRepository.findByUserOrderBySavedAtDesc(user);
 
-        // 2. Extrahiere die Foto-Informationen und wandle sie in DTOs um
         return timelineEntries.stream()
-                .map(entry -> {
-                    // Hole das Foto aus dem Timeline-Eintrag
-                    var photo = entry.getPhoto();
-                    // Erstelle ein DTO mit den Foto-Details
-                    return new PhotoResponseDTO(
-                            photo.getId(),
-                            photo.getStorageUrl(),
-                            photo.getUploadedAt(),
-                            photo.getPlace().getId().intValue(),
-                            photo.getPlace().getName(),
-                            photo.getUploader().getId(),
-                            photo.getUploader().getUsername(),
-                            photo.getUploader().getProfileImageUrl()
-                    );
-                })
+                // Extrahiere das Photo-Objekt aus dem Timeline-Eintrag
+                .map(TimelineEntry::getPhoto)
+                // Rufe die Hilfsmethode auf, die die signierten URLs korrekt generiert
+                .map(photoService::toPhotoResponseDTO)
                 .collect(Collectors.toList());
     }
 
