@@ -22,7 +22,7 @@ import java.time.OffsetDateTime;
  * This entity is used in association with other entities, such as photos, that reference a specific place.
  */
 @Entity
-@Table(name = "places")
+@Table(name = "google_places")
 @Getter
 @Setter
 public class GooglePlace {
