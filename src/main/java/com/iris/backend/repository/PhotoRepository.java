@@ -29,23 +29,23 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
 
 
     @Query(value = """
-    SELECT DISTINCT ph.*
-    FROM
-        photos ph,
-        jsonb_to_recordset(cast(:historyJson as jsonb)) AS h(latitude float, longitude float, "timestamp" timestamptz)
-    WHERE
-        ph.place_id = :placeId
-        AND ph.visibility = 'PUBLIC'
-        -- Prüfe, ob der historische Punkt des Users in der Nähe des Ortes war (z.B. 500m Radius)
-        AND ST_DWithin(
-            (SELECT location FROM googlePlaces WHERE id = :placeId),
-            ST_MakePoint(h.longitude, h.latitude)::geography,
-            500
-        )
-        -- Prüfe, ob das Foto im 5-Stunden-Fenster vor diesem Besuch hochgeladen wurde
-        AND ph.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
-    ORDER BY ph.uploaded_at DESC
-    """, nativeQuery = true)
+SELECT DISTINCT ph.*
+FROM
+    photos ph,
+    jsonb_to_recordset(:historyJson::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
+WHERE
+    ph.google_place_id = :placeId
+    AND ph.visibility = 'PUBLIC'
+    -- Prüfe, ob der historische Punkt des Users in der Nähe des Ortes war
+    AND ST_DWithin(
+        (SELECT location FROM google_places WHERE id = :placeId), -- KORREKTUR HIER
+        ST_MakePoint(h.longitude, h.latitude)::geography,
+        500
+    )
+    -- Prüfe, ob das Foto im 5-Stunden-Fenster vor diesem Besuch hochgeladen wurde
+    AND ph.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
+ORDER BY ph.uploaded_at DESC
+""", nativeQuery = true)
     List<Photo> findPhotosForPlaceMatchingHistoricalBatch(
             @Param("placeId") Long placeId,
             @Param("historyJson") String historyJson
