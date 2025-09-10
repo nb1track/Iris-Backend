@@ -4,9 +4,9 @@ import com.iris.backend.dto.FriendRequestDTO;
 import com.iris.backend.dto.FriendshipActionDTO;
 import com.iris.backend.dto.PendingRequestDTO;
 import com.iris.backend.dto.UserDTO;
-import com.iris.backend.model.Place;
+import com.iris.backend.model.GooglePlace;
 import com.iris.backend.model.User;
-import com.iris.backend.repository.PlaceRepository;
+import com.iris.backend.repository.GooglePlaceRepository;
 import com.iris.backend.service.FriendshipService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,16 +21,16 @@ import org.springframework.http.HttpStatus;
 public class FriendshipController {
 
     private final FriendshipService friendshipService;
-    private final PlaceRepository placeRepository;
+    private final GooglePlaceRepository googlePlaceRepository;
 
     /**
      * Constructor for FriendshipController.
      *
      * @param friendshipService the service used to handle friendship-related operations
      */
-    public FriendshipController(FriendshipService friendshipService, PlaceRepository placeRepository) {
+    public FriendshipController(FriendshipService friendshipService, GooglePlaceRepository googlePlaceRepository) {
         this.friendshipService = friendshipService;
-        this.placeRepository = placeRepository;
+        this.googlePlaceRepository = googlePlaceRepository;
     }
 
     /**
@@ -126,11 +126,11 @@ public class FriendshipController {
             @RequestParam Long placeId) {
 
         // Finde den Ort anhand der ID
-        Place place = placeRepository.findById(placeId)
+        GooglePlace googlePlace = googlePlaceRepository.findById(placeId)
                 .orElseThrow(() -> new RuntimeException("Place not found"));
 
         // Finde die nahen Freunde an diesem Ort
-        List<UserDTO> nearbyFriends = friendshipService.findNearbyFriendsAtPlace(currentUser, place.getLocation());
+        List<UserDTO> nearbyFriends = friendshipService.findNearbyFriendsAtPlace(currentUser, googlePlace.getLocation());
         return ResponseEntity.ok(nearbyFriends);
     }
 

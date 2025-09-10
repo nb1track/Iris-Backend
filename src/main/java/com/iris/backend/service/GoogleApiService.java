@@ -1,8 +1,8 @@
 package com.iris.backend.service;
 
 import com.iris.backend.dto.PlaceDTO;
-import com.iris.backend.model.Place;
-import com.iris.backend.repository.PlaceRepository;
+import com.iris.backend.model.GooglePlace;
+import com.iris.backend.repository.GooglePlaceRepository;
 import com.google.maps.GeoApiContext;
 import com.google.maps.PlacesApi;
 import com.google.maps.model.LatLng;
@@ -25,7 +25,7 @@ public class GoogleApiService {
 
     private static final Logger logger = LoggerFactory.getLogger(GoogleApiService.class);
     private final GeoApiContext geoApiContext;
-    private final PlaceRepository placeRepository;
+    private final GooglePlaceRepository googlePlaceRepository;
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
     // Die "schwarze Liste" von uninteressanten Ortstypen, die wir ignorieren.
@@ -35,9 +35,9 @@ public class GoogleApiService {
             "locality", "sublocality", "postal_code", "plus_code", "doctor"
     );
 
-    public GoogleApiService(GeoApiContext geoApiContext, PlaceRepository placeRepository) {
+    public GoogleApiService(GeoApiContext geoApiContext, GooglePlaceRepository googlePlaceRepository) {
         this.geoApiContext = geoApiContext;
-        this.placeRepository = placeRepository;
+        this.googlePlaceRepository = googlePlaceRepository;
     }
 
     /**
@@ -69,14 +69,14 @@ public class GoogleApiService {
      * Saves or updates a place based on a Places API result.
      */
     private PlaceDTO saveOrUpdatePlaceFromPoi(com.google.maps.model.PlacesSearchResult placeResult) {
-        Place place = placeRepository.findByGooglePlaceId(placeResult.placeId).orElseGet(Place::new);
-        place.setGooglePlaceId(placeResult.placeId);
-        place.setName(placeResult.name);
-        place.setAddress(placeResult.vicinity); // 'vicinity' ist oft eine nützliche Kurzbeschreibung
-        place.setLocation(geometryFactory.createPoint(new Coordinate(placeResult.geometry.location.lng, placeResult.geometry.location.lat)));
+        GooglePlace googlePlace = googlePlaceRepository.findByGooglePlaceId(placeResult.placeId).orElseGet(GooglePlace::new);
+        googlePlace.setGooglePlaceId(placeResult.placeId);
+        googlePlace.setName(placeResult.name);
+        googlePlace.setAddress(placeResult.vicinity); // 'vicinity' ist oft eine nützliche Kurzbeschreibung
+        googlePlace.setLocation(geometryFactory.createPoint(new Coordinate(placeResult.geometry.location.lng, placeResult.geometry.location.lat)));
 
-        Place savedPlace = placeRepository.save(place);
+        GooglePlace savedGooglePlace = googlePlaceRepository.save(googlePlace);
 
-        return new PlaceDTO(savedPlace.getId(), savedPlace.getGooglePlaceId(), savedPlace.getName(), savedPlace.getAddress(), null);
+        return new PlaceDTO(savedGooglePlace.getId(), savedGooglePlace.getGooglePlaceId(), savedGooglePlace.getName(), savedGooglePlace.getAddress(), null);
     }
 }

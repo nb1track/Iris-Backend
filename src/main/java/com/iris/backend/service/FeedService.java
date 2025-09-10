@@ -2,10 +2,7 @@ package com.iris.backend.service;
 
 import com.iris.backend.dto.FeedPlaceDTO;
 import com.iris.backend.dto.HistoricalPointDTO;
-import com.iris.backend.dto.PhotoResponseDTO;
 import com.iris.backend.dto.PlaceDTO;
-import com.iris.backend.model.Photo;
-import com.iris.backend.model.Place;
 import com.iris.backend.repository.FeedRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,10 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.sql.Timestamp;
 
 @Service

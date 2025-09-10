@@ -38,7 +38,7 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
         AND ph.visibility = 'PUBLIC'
         -- Prüfe, ob der historische Punkt des Users in der Nähe des Ortes war (z.B. 500m Radius)
         AND ST_DWithin(
-            (SELECT location FROM places WHERE id = :placeId),
+            (SELECT location FROM googlePlaces WHERE id = :placeId),
             ST_MakePoint(h.longitude, h.latitude)::geography,
             500
         )

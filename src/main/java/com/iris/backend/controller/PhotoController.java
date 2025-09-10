@@ -3,6 +3,7 @@ package com.iris.backend.controller;
 import com.iris.backend.dto.PhotoResponseDTO;
 import java.util.List;
 import com.iris.backend.dto.PhotoUploadRequest;
+import com.iris.backend.dto.PhotoUploadRequestDTO;
 import com.iris.backend.dto.PhotoUploadResponse;
 import com.iris.backend.model.User;
 import com.iris.backend.repository.UserRepository;
@@ -56,21 +57,23 @@ public class PhotoController {
      */
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<PhotoUploadResponse> uploadPhoto(
-            @AuthenticationPrincipal User uploader, // <-- User aus dem Token holen
+            @AuthenticationPrincipal User uploader,
             @RequestPart("file") MultipartFile file,
             @RequestPart("metadata") String metadataJson
-    ) throws JsonProcessingException {
+    ) throws Exception {
 
-        PhotoUploadRequest metadata = objectMapper.readValue(metadataJson, PhotoUploadRequest.class);
+        // Dieses DTO hat die Felder googlePlaceId und customPlaceId
+        PhotoUploadRequestDTO metadata = objectMapper.readValue(metadataJson, PhotoUploadRequestDTO.class);
 
-        // 'uploader' kommt jetzt sicher aus dem Token, nicht mehr aus dem DTO
+        // KORREKTUR: Wir übergeben jetzt die richtigen Parameter an den Service
         UUID newPhotoId = photoService.createPhoto(
                 file,
                 metadata.latitude(),
                 metadata.longitude(),
                 metadata.visibility(),
-                metadata.placeId(),
-                uploader, // <-- Den authentifizierten User übergeben
+                metadata.googlePlaceId(), // Korrekter Parameter
+                metadata.customPlaceId(),  // Korrekter Parameter
+                uploader,
                 metadata.friendIds()
         );
 

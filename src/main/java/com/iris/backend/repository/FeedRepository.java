@@ -24,7 +24,7 @@ public interface FeedRepository extends JpaRepository<Photo, UUID> {
                      ON ph.visibility = 'PUBLIC'
                     AND ph.uploaded_at >= now() - interval '24 hours'
                   AND ph.uploaded_at BETWEEN h.timestamp - interval '5 hours' AND h.timestamp + interval '5 hours'
-                 JOIN places p
+                 JOIN googlePlaces p
                    ON ph.place_id = p.id
                   AND ST_DWithin(p.location, ST_MakePoint(h.longitude, h.latitude)::geography, :radiusInMeters)
              )
@@ -48,7 +48,7 @@ public interface FeedRepository extends JpaRepository<Photo, UUID> {
                 MIN(mp.visit_time) AS visitTime
             
             FROM matching_photos mp
-            JOIN places p ON mp.place_id = p.id
+            JOIN googlePlaces p ON mp.place_id = p.id
             
             GROUP BY p.id, p.google_place_id, p.name, p.address
             ORDER BY visitTime DESC    

@@ -2,8 +2,8 @@ package com.iris.backend.service;
 
 import com.iris.backend.dto.HistoricalPointDTO;
 import com.iris.backend.dto.PlaceDTO;
-import com.iris.backend.model.Place;
-import com.iris.backend.repository.PlaceRepository;
+import com.iris.backend.model.GooglePlace;
+import com.iris.backend.repository.GooglePlaceRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -27,7 +27,7 @@ import java.util.stream.Stream;
 @Service
 public class PlaceService {
 
-    private final PlaceRepository placeRepository;
+    private final GooglePlaceRepository googlePlaceRepository;
     private final ObjectMapper objectMapper;
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
     private final GoogleApiService googleApiService;
@@ -40,11 +40,11 @@ public class PlaceService {
      * historical or public gallery data. It utilizes the provided PlaceRepository for database
      * interactions and ObjectMapper for JSON operations.
      *
-     * @param placeRepository the repository used for querying and managing Place entities
+     * @param googlePlaceRepository the repository used for querying and managing Place entities
      * @param objectMapper the JSON mapper used for processing JSON data
      */
-    public PlaceService(PlaceRepository placeRepository, ObjectMapper objectMapper, GoogleApiService googleApiService) {
-        this.placeRepository = placeRepository;
+    public PlaceService(GooglePlaceRepository googlePlaceRepository, ObjectMapper objectMapper, GoogleApiService googleApiService) {
+        this.googlePlaceRepository = googlePlaceRepository;
         this.objectMapper = objectMapper;
         this.googleApiService = googleApiService;
 
@@ -68,9 +68,9 @@ public class PlaceService {
             // Wandle die Liste der Punkte in einen JSON-String um
             String historyJson = objectMapper.writeValueAsString(history);
 
-            List<Place> places = placeRepository.findPlacesMatchingHistoricalBatch(historyJson, radius);
+            List<GooglePlace> googlePlaces = googlePlaceRepository.findPlacesMatchingHistoricalBatch(historyJson, radius);
 
-            return places.stream()
+            return googlePlaces.stream()
                     .map(place -> new PlaceDTO(
                             place.getId(),
                             place.getGooglePlaceId(),
@@ -100,12 +100,12 @@ public class PlaceService {
      * @return a list of PlaceDTO objects representing the public galleries that meet the specified criteria
      */
     public List<PlaceDTO> getPublicGalleries(double latitude, double longitude, double radius, Optional<OffsetDateTime> timestamp) {
-        List<Place> places;
+        List<GooglePlace> googlePlaces;
 
-            places = placeRepository.findPlacesWithActivePublicPhotosInTimeWindow(latitude, longitude, radius, timestamp.get());
+            googlePlaces = googlePlaceRepository.findPlacesWithActivePublicPhotosInTimeWindow(latitude, longitude, radius, timestamp.get());
 
 
-        return places.stream()
+        return googlePlaces.stream()
                 .map(place -> new PlaceDTO(
                         place.getId(),
                         place.getGooglePlaceId(),
@@ -125,29 +125,29 @@ public class PlaceService {
      */
     @Transactional
     public PlaceDTO createCustomPlace(CreatePlaceRequestDTO request, User creator) {
-        Place newPlace = new Place();
+        GooglePlace newGooglePlace = new GooglePlace();
 
-        newPlace.setName(request.name());
+        newGooglePlace.setName(request.name());
 
         // Da dies kein Google Place ist, generieren wir eine eigene, einzigartige ID,
         // um Konflikte zu vermeiden.
-        newPlace.setGooglePlaceId("custom_" + UUID.randomUUID().toString());
+        newGooglePlace.setGooglePlaceId("custom_" + UUID.randomUUID().toString());
 
         // Erstelle einen PostGIS-Punkt aus den Koordinaten
         Point location = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
-        newPlace.setLocation(location);
+        newGooglePlace.setLocation(location);
 
         // Die Adresse lassen wir bei benutzerdefinierten Orten erstmal weg
-        newPlace.setAddress("Custom Location");
+        newGooglePlace.setAddress("Custom Location");
 
-        Place savedPlace = placeRepository.save(newPlace);
+        GooglePlace savedGooglePlace = googlePlaceRepository.save(newGooglePlace);
 
         // Wandle die gespeicherte Entität in ein DTO um und gib sie zurück
         return new PlaceDTO(
-                savedPlace.getId(),
-                savedPlace.getGooglePlaceId(),
-                savedPlace.getName(),
-                savedPlace.getAddress(),
+                savedGooglePlace.getId(),
+                savedGooglePlace.getGooglePlaceId(),
+                savedGooglePlace.getName(),
+                savedGooglePlace.getAddress(),
                 null // Ein neuer Ort hat noch keine Fotos
         );
     }
@@ -164,7 +164,7 @@ public class PlaceService {
 
         // 2. Hole Orte aus unserer eigenen Datenbank (mit der neuen Repository-Methode)
         double searchRadius = 200; // z.B. 200 Meter für die lokale Suche
-        List<Place> customPlacesFromDb = placeRepository.findPlacesWithinRadius(latitude, longitude, searchRadius);
+        List<GooglePlace> customPlacesFromDb = googlePlaceRepository.findPlacesWithinRadius(latitude, longitude, searchRadius);
 
         // Wandle unsere DB-Orte auch in DTOs um
         List<PlaceDTO> customPlaceDTOs = customPlacesFromDb.stream()

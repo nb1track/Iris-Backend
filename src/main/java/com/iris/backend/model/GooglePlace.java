@@ -25,7 +25,7 @@ import java.time.OffsetDateTime;
 @Table(name = "places")
 @Getter
 @Setter
-public class Place {
+public class GooglePlace {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
