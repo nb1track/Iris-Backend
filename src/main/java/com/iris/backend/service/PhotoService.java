@@ -1,5 +1,8 @@
 package com.iris.backend.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.iris.backend.dto.HistoricalPointDTO;
 import com.iris.backend.dto.PhotoResponseDTO;
 import com.iris.backend.model.*;
 import com.iris.backend.model.enums.PhotoVisibility;
@@ -144,6 +147,24 @@ public class PhotoService {
                 friends, PhotoVisibility.FRIENDS, OffsetDateTime.now()
         );
         return photos.stream().map(this::toPhotoResponseDTO).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PhotoResponseDTO> findHistoricalPhotosForPlace(Long placeId, List<HistoricalPointDTO> history) {
+        if (history == null || history.isEmpty()) {
+            return List.of();
+        }
+        try {
+            // HINWEIS: ObjectMapper muss als Abhängigkeit im Konstruktor vorhanden sein.
+            ObjectMapper objectMapper = new ObjectMapper();
+            String historyJson = objectMapper.writeValueAsString(history);
+            List<Photo> photos = photoRepository.findPhotosForPlaceMatchingHistoricalBatch(placeId, historyJson);
+            return photos.stream()
+                    .map(this::toPhotoResponseDTO)
+                    .collect(Collectors.toList());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Error processing historical photo data", e);
+        }
     }
 
     public PhotoResponseDTO toPhotoResponseDTO(Photo photo) {

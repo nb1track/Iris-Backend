@@ -58,4 +58,6 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
     );
 
     List<Photo> findAllByUploader(User uploader);
+
+
 }
