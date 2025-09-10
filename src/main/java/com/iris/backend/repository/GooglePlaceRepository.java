@@ -9,25 +9,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 
-/**
- * Repository interface for managing Place entities.
- *
- * This interface provides methods for interacting with the `googlePlaces` table
- * in the database. It extends JpaRepository, inheriting standard CRUD
- * operations, and defines custom query methods for specific use cases.
- *
- * Key functionalities:
- * - Retrieve a Place entity by its unique Google Place ID.
- * - Find googlePlaces that have active public photos within a geographical radius
- *   during a specified time window.
- */
 @Repository
 public interface GooglePlaceRepository extends JpaRepository<GooglePlace, Long> {
     Optional<GooglePlace> findByGooglePlaceId(String googlePlaceId);
 
     @Query(value = """
-    SELECT DISTINCT p.* FROM googlePlaces p
-    JOIN photos ph ON p.id = ph.place_id
+    SELECT DISTINCT p.* FROM google_places p
+    JOIN photos ph ON p.id = ph.google_place_id 
     WHERE ph.visibility = 'PUBLIC'
       AND ph.uploaded_at BETWEEN (:timestamp - interval '5 hours') AND :timestamp
       AND ST_DWithin(p.location, ST_MakePoint(:longitude, :latitude)::geography, :radiusInMeters)
@@ -42,9 +30,9 @@ public interface GooglePlaceRepository extends JpaRepository<GooglePlace, Long> 
     @Query(value = """
         SELECT DISTINCT p.*
         FROM
-            googlePlaces p
+            google_places p
         JOIN
-            photos ph ON p.id = ph.place_id,
+            photos ph ON p.id = ph.google_place_id,
             jsonb_to_recordset(:historyJson::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
         WHERE
             ph.visibility = 'PUBLIC'
@@ -57,7 +45,7 @@ public interface GooglePlaceRepository extends JpaRepository<GooglePlace, Long> 
     );
 
     @Query(value = """
-        SELECT * FROM googlePlaces p
+        SELECT * FROM google_places p
         WHERE ST_DWithin(p.location, ST_MakePoint(:longitude, :latitude)::geography, :radiusInMeters)
         """, nativeQuery = true)
     List<GooglePlace> findPlacesWithinRadius(
