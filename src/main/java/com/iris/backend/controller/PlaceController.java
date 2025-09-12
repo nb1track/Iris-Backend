@@ -50,8 +50,8 @@ public class PlaceController {
             @RequestParam double latitude,
             @RequestParam double longitude) {
 
-        // Rufe die neue Methode auf, die beide Quellen durchsucht
-        List<PlaceDTO> nearbyPlaces = placeService.findNearbyCombinedPlaces(latitude, longitude);
+        // KORREKTUR: Rufe die umbenannte und korrekte Methode im Service auf.
+        List<PlaceDTO> nearbyPlaces = placeService.findActiveNearbyPlaces(latitude, longitude);
         return ResponseEntity.ok(nearbyPlaces);
     }
 

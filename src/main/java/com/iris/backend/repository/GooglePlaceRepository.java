@@ -53,4 +53,18 @@ public interface GooglePlaceRepository extends JpaRepository<GooglePlace, Long> 
             @Param("longitude") double longitude,
             @Param("radiusInMeters") double radiusInMeters
     );
+
+    @Query(value = """
+    SELECT * FROM google_places p
+    WHERE ST_DWithin(
+        p.location,
+        ST_MakePoint(:longitude, :latitude)::geography,
+        p.radius_meters
+    )
+    ORDER BY p.importance DESC
+    """, nativeQuery = true)
+    List<GooglePlace> findActivePlacesForUserLocation(
+            @Param("latitude") double latitude,
+            @Param("longitude") double longitude
+    );
 }

@@ -2,7 +2,6 @@ package com.iris.backend.controller;
 
 import com.iris.backend.dto.PhotoResponseDTO;
 import java.util.List;
-import com.iris.backend.dto.PhotoUploadRequest;
 import com.iris.backend.dto.PhotoUploadRequestDTO;
 import com.iris.backend.dto.PhotoUploadResponse;
 import com.iris.backend.model.User;
