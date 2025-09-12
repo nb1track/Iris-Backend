@@ -73,23 +73,4 @@ public class PlaceController {
         );
         return ResponseEntity.ok(photos);
     }
-
-    /**
-     * Creates a new custom place based on user input.
-     *
-     * @param currentUser The authenticated user creating the place.
-     * @param request The DTO containing the name and coordinates of the new place.
-     * @return A ResponseEntity with the newly created PlaceDTO and HTTP status 201 (Created).
-     */
-    @PostMapping("/custom")
-    public ResponseEntity<PlaceDTO> createCustomPlace(
-            @AuthenticationPrincipal User currentUser,
-            @RequestBody @Valid CreatePlaceRequestDTO request) {
-
-        // Wir übergeben die Anfrage an den Service, der die Logik enthält
-        PlaceDTO newPlace = placeService.createCustomPlace(request, currentUser);
-
-        // Wir geben den neu erstellten Ort an das Frontend zurück
-        return ResponseEntity.status(HttpStatus.CREATED).body(newPlace);
-    }
 }
