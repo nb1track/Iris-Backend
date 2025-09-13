@@ -80,4 +80,19 @@ public class PlaceService {
             throw new RuntimeException("Error processing historical data", e);
         }
     }
+
+    /**
+     * Retrieves a list of trending spots by fetching all custom places marked as trending,
+     * and transforms them into PlaceDTO objects sorted by their creation date in descending order.
+     *
+     * @return a list of PlaceDTO objects representing the trending custom places
+     */
+    public List<PlaceDTO> findTrendingSpots() {
+        List<CustomPlace> trendingCustomPlaces = customPlaceRepository.findAllByIsTrendingTrueOrderByCreatedAtDesc();
+
+        // Wandle die CustomPlaces in das allgemeine PlaceDTO um
+        return trendingCustomPlaces.stream()
+                .map(p -> new PlaceDTO(null, "custom_" + p.getId(), p.getName(), "Custom Location", null, p.getRadiusMeters(), 0))
+                .collect(Collectors.toList());
+    }
 }

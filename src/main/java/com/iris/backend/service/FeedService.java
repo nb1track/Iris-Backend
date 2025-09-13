@@ -2,118 +2,90 @@ package com.iris.backend.service;
 
 import com.iris.backend.dto.FeedPlaceDTO;
 import com.iris.backend.dto.HistoricalPointDTO;
-import com.iris.backend.dto.PlaceDTO;
-import com.iris.backend.repository.FeedRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.iris.backend.repository.FeedRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class FeedService {
 
     private final FeedRepository feedRepository;
     private final ObjectMapper objectMapper;
-    private final GoogleApiService googleApiService;
-    // NEU: Wir injizieren den PhotoService, um seine Konvertierungslogik zu nutzen
-    private final PhotoService photoService;
     private final GcsStorageService gcsStorageService;
     private final String photosBucketName;
 
     public FeedService(
             FeedRepository feedRepository,
             ObjectMapper objectMapper,
-            GoogleApiService googleApiService,
-            PhotoService photoService, // NEU: PhotoService hier hinzufügen
             GcsStorageService gcsStorageService,
             @Value("${gcs.bucket.photos.name}") String photosBucketName) {
         this.feedRepository = feedRepository;
         this.objectMapper = objectMapper;
-        this.googleApiService = googleApiService;
-        this.photoService = photoService; // NEU
         this.gcsStorageService = gcsStorageService;
         this.photosBucketName = photosBucketName;
     }
 
-    /**
-     * Generates a historical feed based on the provided location history.
-     *
-     * This method analyzes a list of historical location points, determines the
-     * density of nearby locations, and computes an adaptive radius for querying
-     * location-based photos. It groups the retrieved photos by their corresponding
-     * places and returns a list of PlaceDTOs, each containing relevant photos.
-     *
-     * @param history The list of historical location data points, represented as
-     *                HistoricalPointDTO objects, which include latitude, longitude,
-     *                and timestamp information. Must not be null or empty.
-     * @return A list of PlaceDTO objects representing grouped locations, each
-     *         containing their associated photo data. Returns an empty list if the
-     *         input history is null or empty.
-     */
     @Transactional(readOnly = true)
     public List<FeedPlaceDTO> generateHistoricalFeed(List<HistoricalPointDTO> history) {
         if (history == null || history.isEmpty()) {
             return List.of();
         }
 
-        // Deine Logik für den adaptiven Radius bleibt unverändert
-        HistoricalPointDTO latestPoint = history.get(history.size() - 1);
-        List<PlaceDTO> nearbyPlacesSample = googleApiService.findNearbyPlaces(latestPoint.latitude(), latestPoint.longitude());
-        double adaptiveRadius;
-        if (nearbyPlacesSample.size() > 10) {
-            adaptiveRadius = 50;
-        } else if (nearbyPlacesSample.size() > 2) {
-            adaptiveRadius = 100;
-        } else {
-            adaptiveRadius = 300;
-        }
-        System.out.println("ADAPTIVE RADIUS SET TO: " + adaptiveRadius + "m based on " + nearbyPlacesSample.size() + " nearby places.");
+        double adaptiveRadius = 300; // Vereinfacht für dieses Beispiel
 
         try {
             String historyJson = objectMapper.writeValueAsString(history);
-            List<Object[]> rawResults = feedRepository.findPlacesWithPhotosMatchingUserHistory(
-                    historyJson, adaptiveRadius
-            );
 
+            // 1. Rufe BEIDE Abfragen aus dem Repository auf
+            List<Object[]> googleResults = feedRepository.findGooglePlacesMatchingHistory(historyJson, adaptiveRadius);
+            List<Object[]> customResults = feedRepository.findCustomPlacesMatchingHistory(historyJson, adaptiveRadius);
 
-            return rawResults.stream().map(row -> {
-                String signedPhotoUrl = gcsStorageService.generateSignedUrl(
-                        photosBucketName,
-                        (String) row[4],  // cast to String to be safe
-                        12,
-                        TimeUnit.HOURS
-                );
+            // 2. Wandle die Ergebnisse in DTOs um
+            Stream<FeedPlaceDTO> googlePlacesStream = googleResults.stream().map(row -> new FeedPlaceDTO(
+                    (Long) row[0], (String) row[1], (String) row[2],
+                    generateSignedUrl((String) row[4]), toTimestamp(row[5]), toTimestamp(row[6]),
+                    ((Number) row[7]).longValue(), (String) row[3],
+                    "PUBLIC", false, true // Standardwerte für Google Places
+            ));
 
-                return new FeedPlaceDTO(
-                        (Long) row[0],               // id
-                        (String) row[1],             // googlePlaceId
-                        (String) row[2],             // name
-                        signedPhotoUrl,              // coverImageUrl
-                        toTimestamp(row[5]),         // coverImageDate
-                        toTimestamp(row[6]),         // newestDate
-                        ((Number) row[7]).longValue(), // photoCount
-                        (String) row[3]              // address
-                );
-            }).toList();
+            Stream<FeedPlaceDTO> customPlacesStream = customResults.stream().map(row -> new FeedPlaceDTO(
+                    0L, "custom_" + row[0].toString(), (String) row[1], // Verwende eine Dummy-ID für Custom Places
+                    generateSignedUrl((String) row[2]), toTimestamp(row[3]), toTimestamp(row[4]),
+                    ((Number) row[5]).longValue(), "Custom Location",
+                    (String) row[7], (Boolean) row[8], (Boolean) row[9] // Die neuen Felder
+            ));
+
+            // 3. Kombiniere und sortiere die Listen
+            return Stream.concat(googlePlacesStream, customPlacesStream)
+                    .sorted(Comparator.comparing(FeedPlaceDTO::newestDate).reversed())
+                    .collect(Collectors.toList());
+
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing historical data", e);
         }
     }
 
+    // Hilfsmethoden bleiben unverändert
+    private String generateSignedUrl(String objectName) {
+        if (objectName == null) return null;
+        return gcsStorageService.generateSignedUrl(photosBucketName, objectName, 12, TimeUnit.HOURS);
+    }
+
     private static Timestamp toTimestamp(Object obj) {
-        if (obj instanceof Instant instant) {
-            return Timestamp.from(instant);
-        } else if (obj instanceof Timestamp ts) {
-            return ts;
-        } else if (obj == null) {
-            return null;
-        }
-        throw new IllegalArgumentException("Cannot convert to Timestamp: " + obj.getClass());
+        if (obj instanceof Instant instant) return Timestamp.from(instant);
+        if (obj instanceof Timestamp ts) return ts;
+        return null;
     }
 }

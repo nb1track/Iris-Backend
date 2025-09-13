@@ -24,5 +24,8 @@ public record FeedPlaceDTO(
         Timestamp coverImageDate,
         Timestamp newestDate,
         long photoCount,
-        String address
+        String address,
+        String accessType,
+        Boolean isTrending,
+        Boolean isLive
 ) {}
