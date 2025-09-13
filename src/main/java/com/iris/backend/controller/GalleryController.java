@@ -46,19 +46,4 @@ public class GalleryController {
         List<PlaceDTO> galleries = placeService.findHistoricalGalleriesBatch(searchRequest.history(), radius);
         return ResponseEntity.ok(galleries);
     }
-
-    @GetMapping("/active")
-    public ResponseEntity<List<PlaceDTO>> getCurrentPublicGalleries(
-            @RequestParam double latitude,
-            @RequestParam double longitude,
-            @RequestParam(defaultValue = "5000") double radius) {
-
-        List<PlaceDTO> galleries = placeService.getPublicGalleries(
-                latitude,
-                longitude,
-                radius,
-                Optional.of(OffsetDateTime.now())
-        );
-        return ResponseEntity.ok(galleries);
-    }
 }
