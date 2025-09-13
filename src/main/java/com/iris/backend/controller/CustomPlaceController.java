@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/custom-places")
@@ -41,10 +42,23 @@ public class CustomPlaceController {
     }
 
     @GetMapping("/my-spots")
-    public ResponseEntity<List<CustomPlace>> getMyCreatedSpots(@AuthenticationPrincipal User currentUser) {
-        // Hier wird die neue Repository-Methode aufgerufen
-        List<CustomPlace> mySpots = customPlaceRepository.findAllByCreatorOrderByCreatedAtDesc(currentUser);
-        return ResponseEntity.ok(mySpots);
+    public ResponseEntity<List<PlaceDTO>> getMyCreatedSpots(@AuthenticationPrincipal User currentUser) {
+        List<CustomPlace> mySpotsEntities = customPlaceRepository.findAllByCreatorOrderByCreatedAtDesc(currentUser);
+
+        // NEU: Wandle die Entitäten in dein vollständiges PlaceDTO um
+        List<PlaceDTO> mySpotsDTOs = mySpotsEntities.stream()
+                .map(spot -> new PlaceDTO(
+                        null, // Custom Places haben keine Long-ID
+                        "custom_" + spot.getId().toString(), // Eine eindeutige ID für das Frontend
+                        spot.getName(),
+                        "Custom Location", // Ein passender Platzhalter für die Adresse
+                        null, // In dieser Übersicht werden keine Fotos geladen
+                        spot.getRadiusMeters(), // Radius aus dem CustomPlace-Objekt übernehmen
+                        0 // Setze eine Standard-Wichtigkeit, da Custom Places dieses Feld nicht haben
+                ))
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(mySpotsDTOs);
     }
 
     @GetMapping("/trending")
