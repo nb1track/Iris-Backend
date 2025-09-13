@@ -4,17 +4,20 @@ import com.iris.backend.dto.FriendRequestDTO;
 import com.iris.backend.dto.FriendshipActionDTO;
 import com.iris.backend.dto.PendingRequestDTO;
 import com.iris.backend.dto.UserDTO;
+import com.iris.backend.model.CustomPlace;
 import com.iris.backend.model.GooglePlace;
 import com.iris.backend.model.User;
+import com.iris.backend.repository.CustomPlaceRepository;
 import com.iris.backend.repository.GooglePlaceRepository;
 import com.iris.backend.service.FriendshipService;
+import org.locationtech.jts.geom.Point;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 import java.util.UUID;
-
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/api/v1/friends")
@@ -22,32 +25,63 @@ public class FriendshipController {
 
     private final FriendshipService friendshipService;
     private final GooglePlaceRepository googlePlaceRepository;
+    private final CustomPlaceRepository customPlaceRepository; // NEU
 
-    /**
-     * Constructor for FriendshipController.
-     *
-     * @param friendshipService the service used to handle friendship-related operations
-     */
-    public FriendshipController(FriendshipService friendshipService, GooglePlaceRepository googlePlaceRepository) {
+    public FriendshipController(
+            FriendshipService friendshipService,
+            GooglePlaceRepository googlePlaceRepository,
+            CustomPlaceRepository customPlaceRepository // NEU
+    ) {
         this.friendshipService = friendshipService;
         this.googlePlaceRepository = googlePlaceRepository;
+        this.customPlaceRepository = customPlaceRepository; // NEU
     }
 
     /**
-     * Handles sending a friend request from the authenticated user to another user specified by their ID.
-     * The method validates the location and proximity of both users before processing the request.
+     * Retrieves a list of friends of the authenticated user who are near a specified place.
+     * This endpoint now flexibly handles both Google Places and Custom Places.
      *
-     * @param requester the currently authenticated user sending the friend request, extracted from the authentication token
-     * @param request the data transfer object containing the ID of the user who will receive the friend request
-     * @return a ResponseEntity containing a success message if the request was sent successfully,
-     *         or an error message with the appropriate HTTP status if an exception occurs
+     * @param currentUser The authenticated user.
+     * @param googlePlaceId The ID of the Google Place (optional).
+     * @param customPlaceId The ID of the Custom Place (optional).
+     * @return A list of UserDTOs representing nearby friends.
      */
+    @GetMapping("/at-place")
+    public ResponseEntity<List<UserDTO>> getFriendsAtPlace(
+            @AuthenticationPrincipal User currentUser,
+            @RequestParam(required = false) Long googlePlaceId,
+            @RequestParam(required = false) UUID customPlaceId) {
+
+        // Validierung: Es muss genau eine der beiden IDs angegeben werden.
+        if ((googlePlaceId == null && customPlaceId == null) || (googlePlaceId != null && customPlaceId != null)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Point placeLocation;
+
+        if (googlePlaceId != null) {
+            // Logik, um die Location von einem GooglePlace zu holen
+            GooglePlace googlePlace = googlePlaceRepository.findById(googlePlaceId)
+                    .orElseThrow(() -> new RuntimeException("GooglePlace not found with ID: " + googlePlaceId));
+            placeLocation = googlePlace.getLocation();
+        } else {
+            // Logik, um die Location von einem CustomPlace zu holen
+            CustomPlace customPlace = customPlaceRepository.findById(customPlaceId)
+                    .orElseThrow(() -> new RuntimeException("CustomPlace not found with ID: " + customPlaceId));
+            placeLocation = customPlace.getLocation();
+        }
+
+        // Der Aufruf an den Service bleibt unverändert, da dieser nur eine Location erwartet.
+        List<UserDTO> nearbyFriends = friendshipService.findNearbyFriendsAtPlace(currentUser, placeLocation);
+        return ResponseEntity.ok(nearbyFriends);
+    }
+
+
     @PostMapping("/request")
     public ResponseEntity<String> sendFriendRequest(
-            @AuthenticationPrincipal User requester, // Holt den User aus dem Token
+            @AuthenticationPrincipal User requester,
             @RequestBody FriendRequestDTO request) {
         try {
-            // Übergibt den angemeldeten User und die ID des Empfängers an den Service
             friendshipService.sendFriendRequest(requester, request.addresseeId());
             return ResponseEntity.ok("Friend request sent successfully.");
         } catch (SecurityException e) {
@@ -57,20 +91,12 @@ public class FriendshipController {
         }
     }
 
-    /**
-     * Handles accepting a pending friendship request by an authenticated user.
-     *
-     * @param acceptor the currently authenticated user accepting the friend request, extracted from the authentication token
-     * @param request the data transfer object containing the ID of the friendship to be accepted
-     * @return a ResponseEntity containing a success message if the request was accepted successfully,
-     *         a bad request message if the request is invalid, or a forbidden message for security violations
-     */
     @PostMapping("/accept")
     public ResponseEntity<String> acceptFriendRequest(
-            @AuthenticationPrincipal User acceptor, // Angemeldeten User holen
+            @AuthenticationPrincipal User acceptor,
             @RequestBody FriendshipActionDTO request) {
         try {
-            friendshipService.acceptFriendRequest(request, acceptor); // User an Service übergeben
+            friendshipService.acceptFriendRequest(request, acceptor);
             return ResponseEntity.ok("Friendship accepted.");
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -79,98 +105,40 @@ public class FriendshipController {
         }
     }
 
-    /**
-     * Retrieves a list of pending friend requests for the currently authenticated user.
-     *
-     * @param currentUser the authenticated user for whom the pending requests are being retrieved, extracted from the authentication token
-     * @return a ResponseEntity containing a list of PendingRequestDTO objects representing the user's pending friend requests
-     */
     @GetMapping("/requests/pending")
     public ResponseEntity<List<PendingRequestDTO>> getPendingRequests(@AuthenticationPrincipal User currentUser) {
         List<PendingRequestDTO> requests = friendshipService.getPendingRequests(currentUser);
         return ResponseEntity.ok(requests);
     }
-    /**
-     * Retrieves a list of friends for the currently authenticated user.
-     *
-     * @param user the authenticated user whose friends are being retrieved, extracted from the authentication token
-     * @return a ResponseEntity containing a list of UserDTO objects representing the user's friends,
-     *         or an unauthorized status if the user is not authenticated
-     */
+
     @GetMapping
     public ResponseEntity<List<UserDTO>> getFriends(@AuthenticationPrincipal User user) {
-        // @AuthenticationPrincipal injiziert den User, der durch das Token authentifiziert wurde
         if (user == null) {
-            // Sollte nie passieren, wenn der Security-Filter korrekt arbeitet, aber eine gute Absicherung
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-
-        // Wir benutzen die ID des angemeldeten Users
         List<UserDTO> friends = friendshipService.getFriendsAsDTO(user.getId());
         return ResponseEntity.ok(friends);
     }
 
-    /**
-     * Retrieves a list of friends of the authenticated user who are near a specified place.
-     *
-     * This method finds the specified place by its ID, then fetches and returns
-     * a list of friends that are geographically close to that place.
-     *
-     * @param currentUser the authenticated user making the request
-     * @param placeId the unique identifier of the place to search for nearby friends
-     * @return a ResponseEntity containing a list of UserDTO objects that represent the nearby friends
-     */
-    @GetMapping("/at-place")
-    public ResponseEntity<List<UserDTO>> getFriendsAtPlace(
-            @AuthenticationPrincipal User currentUser,
-            @RequestParam Long placeId) {
-
-        // Finde den Ort anhand der ID
-        GooglePlace googlePlace = googlePlaceRepository.findById(placeId)
-                .orElseThrow(() -> new RuntimeException("Place not found"));
-
-        // Finde die nahen Freunde an diesem Ort
-        List<UserDTO> nearbyFriends = friendshipService.findNearbyFriendsAtPlace(currentUser, googlePlace.getLocation());
-        return ResponseEntity.ok(nearbyFriends);
-    }
-
-    /**
-     * Handles rejecting a pending friendship request.
-     * The entire friendship entry is deleted from the database.
-     *
-     * @param currentUser The currently authenticated user rejecting the request.
-     * @param request The DTO containing the ID of the friendship to be rejected.
-     * @return A ResponseEntity indicating success or failure.
-     */
     @PostMapping("/reject")
     public ResponseEntity<String> rejectFriendRequest(
             @AuthenticationPrincipal User currentUser,
-            @RequestBody FriendshipActionDTO request) { // Wir können das gleiche DTO wie für "accept" wiederverwenden
+            @RequestBody FriendshipActionDTO request) {
         try {
             friendshipService.rejectFriendRequest(request.friendshipId(), currentUser);
             return ResponseEntity.ok("Friendship request rejected and deleted.");
         } catch (SecurityException e) {
-            // Wenn der User nicht berechtigt ist, die Anfrage abzulehnen
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (RuntimeException e) {
-            // Wenn die Freundschaftsanfrage nicht gefunden wurde
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
 
-    /**
-     * Removes a friend from the current user's friend list.
-     *
-     * @param currentUser The authenticated user.
-     * @param friendId The UUID of the friend to be removed.
-     * @return A ResponseEntity indicating success.
-     */
     @DeleteMapping("/{friendId}")
     public ResponseEntity<Void> removeFriend(
             @AuthenticationPrincipal User currentUser,
             @PathVariable UUID friendId) {
-
         friendshipService.removeFriend(currentUser, friendId);
-        return ResponseEntity.noContent().build(); // HTTP 204 No Content ist der Standard für erfolgreiche DELETE-Anfragen
+        return ResponseEntity.noContent().build();
     }
 }

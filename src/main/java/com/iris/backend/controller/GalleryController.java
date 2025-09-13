@@ -6,7 +6,9 @@ import com.iris.backend.service.PlaceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/galleries")
@@ -42,6 +44,21 @@ public class GalleryController {
             @RequestParam(defaultValue = "25000") double radius) {
 
         List<PlaceDTO> galleries = placeService.findHistoricalGalleriesBatch(searchRequest.history(), radius);
+        return ResponseEntity.ok(galleries);
+    }
+
+    @GetMapping("/active")
+    public ResponseEntity<List<PlaceDTO>> getCurrentPublicGalleries(
+            @RequestParam double latitude,
+            @RequestParam double longitude,
+            @RequestParam(defaultValue = "5000") double radius) {
+
+        List<PlaceDTO> galleries = placeService.getPublicGalleries(
+                latitude,
+                longitude,
+                radius,
+                Optional.of(OffsetDateTime.now())
+        );
         return ResponseEntity.ok(galleries);
     }
 }

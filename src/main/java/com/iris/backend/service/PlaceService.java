@@ -11,7 +11,9 @@ import com.iris.backend.repository.GooglePlaceRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -77,5 +79,27 @@ public class PlaceService {
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing historical data", e);
         }
+    }
+
+    /**
+     * Finds active public galleries near a specific location.
+     * A public gallery is a place with recent public photos.
+     */
+    @Transactional(readOnly = true)
+    public List<PlaceDTO> getPublicGalleries(double latitude, double longitude, double radius, Optional<OffsetDateTime> timestamp) {
+        if (timestamp.isEmpty()) {
+            return List.of();
+        }
+
+        List<GooglePlace> places = googlePlaceRepository.findPlacesWithActivePublicPhotosInTimeWindow(
+                latitude,
+                longitude,
+                radius,
+                timestamp.get()
+        );
+
+        return places.stream()
+                .map(p -> new PlaceDTO(p.getId(), p.getGooglePlaceId(), p.getName(), p.getAddress(), null, p.getRadiusMeters(), p.getImportance()))
+                .collect(Collectors.toList());
     }
 }
