@@ -47,7 +47,7 @@ public class Friendship {
     private User userTwo;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "friendship_status")
+    @Column(nullable = false)
     private FriendshipStatus status;
 
     // Der User, der die Aktion ausgeführt hat (z.B. die Anfrage gesendet)
