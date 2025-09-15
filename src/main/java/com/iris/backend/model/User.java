@@ -64,6 +64,9 @@ public class User implements UserDetails {
     @Column(name = "last_location_updated_at")
     private OffsetDateTime lastLocationUpdatedAt;
 
+    @Column(name = "fcm_token")
+    private String fcmToken;
+
     public User() {
     }
 

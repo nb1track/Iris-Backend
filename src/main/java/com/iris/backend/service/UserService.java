@@ -242,4 +242,13 @@ public class UserService {
                 signedProfileUrl // Entweder die URL oder null
         );
     }
+
+    @Transactional
+    public void updateFcmToken(User user, String token) {
+        // Optional: Prüfen, ob der Token sich geändert hat, um unnötige Schreibvorgänge zu vermeiden
+        if (token != null && !token.equals(user.getFcmToken())) {
+            user.setFcmToken(token);
+            userRepository.save(user);
+        }
+    }
 }

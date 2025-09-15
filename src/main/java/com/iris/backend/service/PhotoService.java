@@ -38,6 +38,7 @@ public class PhotoService {
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
     private final String photosBucketName;
     private final String profileImagesBucketName;
+    private final FcmService fcmService;
 
     public PhotoService(
             PhotoRepository photoRepository,
@@ -48,6 +49,7 @@ public class PhotoService {
             @Lazy FriendshipService friendshipService,
             CustomPlaceRepository customPlaceRepository,
             PhotoLikeRepository photoLikeRepository,
+            FcmService fcmService,
             @Value("${gcs.bucket.photos.name}") String photosBucketName,
             @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName
     ) {
@@ -59,6 +61,7 @@ public class PhotoService {
         this.friendshipService = friendshipService;
         this.customPlaceRepository = customPlaceRepository;
         this.photoLikeRepository = photoLikeRepository;
+        this.fcmService = fcmService;
         this.photosBucketName = photosBucketName;
         this.profileImagesBucketName = profileImagesBucketName;
     }
@@ -105,6 +108,17 @@ public class PhotoService {
                     timelineEntryRepository.save(newEntry);
                 }
             }
+
+            if (savedPhoto.getVisibility() == PhotoVisibility.FRIENDS) {
+                List<User> friends = friendshipService.getFriendsAsEntities(uploader.getId());
+                List<String> friendTokens = friends.stream()
+                        .map(User::getFcmToken)
+                        .filter(token -> token != null && !token.isEmpty())
+                        .toList();
+
+                fcmService.sendNewPhotoNotification(friendTokens, savedPhoto);
+            }
+
             return savedPhoto.getId();
         } catch (IOException e) {
             throw new RuntimeException("Could not upload file: " + e.getMessage());

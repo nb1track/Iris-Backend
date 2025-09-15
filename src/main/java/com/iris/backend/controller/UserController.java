@@ -1,14 +1,12 @@
 package com.iris.backend.controller;
 
-import com.iris.backend.dto.LocationUpdateRequestDTO;
+import com.iris.backend.dto.*;
 import com.iris.backend.model.User;
 import com.iris.backend.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.iris.backend.dto.UserDataExportDTO;
-import com.iris.backend.dto.SignUpRequestDTO;
-import com.iris.backend.dto.UserDTO;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
@@ -159,5 +157,13 @@ public class UserController {
         // Wir übergeben den User direkt an den Service, der ihn in ein DTO umwandelt.
         UserDTO userProfile = userService.getUserProfile(currentUser);
         return ResponseEntity.ok(userProfile);
+    }
+
+    @PutMapping("/me/fcm-token")
+    public ResponseEntity<Void> updateFcmToken(
+            @AuthenticationPrincipal User currentUser,
+            @RequestBody @Valid FcmTokenUpdateRequestDTO request) {
+        userService.updateFcmToken(currentUser, request.token());
+        return ResponseEntity.ok().build();
     }
 }
