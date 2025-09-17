@@ -1,5 +1,6 @@
 package com.iris.backend.repository;
 
+import com.iris.backend.model.CustomPlace;
 import com.iris.backend.model.Photo;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -59,5 +60,13 @@ ORDER BY ph.uploaded_at DESC
 
     List<Photo> findAllByUploader(User uploader);
 
+    /**
+     * Findet alle einzigartigen (distinct) Benutzer, die Fotos zu einem
+     * bestimmten CustomPlace hochgeladen haben.
+     * @param customPlace Der CustomPlace, für den die Teilnehmer gesucht werden.
+     * @return Eine Liste von einzigartigen User-Objekten.
+     */
+    @Query("SELECT DISTINCT p.uploader FROM Photo p WHERE p.customPlace = :customPlace")
+    List<User> findDistinctUploadersByCustomPlace(CustomPlace customPlace);
 
 }
