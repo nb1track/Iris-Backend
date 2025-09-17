@@ -14,6 +14,8 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
@@ -250,5 +252,23 @@ public class UserService {
             user.setFcmToken(token);
             userRepository.save(user);
         }
+    }
+
+    /**
+     * Führt eine paginierte Suche nach Benutzern durch.
+     *
+     * @param query Der Suchbegriff.
+     * @param currentUser Der eingeloggte Benutzer, der die Suche durchführt.
+     * @param pageable Paginierungsinformationen.
+     * @return Eine Seite (Page) von UserDTOs.
+     */
+    @Transactional(readOnly = true)
+    public Page<UserDTO> searchUsers(String query, User currentUser, Pageable pageable) {
+        // 1. Rufe die neue Repository-Methode auf
+        Page<User> userPage = userRepository.searchUsers(query, currentUser.getId(), pageable);
+
+        // 2. Wandle jede Seite von User-Objekten in UserDTOs um
+        // Die .map()-Funktion von Page macht das sehr elegant
+        return userPage.map(this::getUserProfile); // Wir können hier die existierende Methode wiederverwenden!
     }
 }

@@ -2,6 +2,8 @@ package com.iris.backend.repository;
 
 import com.iris.backend.model.User;
 import org.locationtech.jts.geom.Point;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -47,4 +49,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             @Param("radius") double radius,
             @Param("currentUserId") UUID currentUserId
     );
+
+    /**
+     * Sucht nach Benutzern, deren Benutzername den Suchbegriff enthält (case-insensitive).
+     * Der aktuelle Benutzer wird von den Ergebnissen ausgeschlossen.
+     * Die Ergebnisse werden paginiert zurückgegeben.
+     *
+     * @param query Der Suchbegriff.
+     * @param currentUserId Die ID des suchenden Benutzers, der ausgeschlossen werden soll.
+     * @param pageable Das Pageable-Objekt, das Paginierungs- und Sortierinformationen enthält.
+     * @return Eine Seite (Page) von User-Objekten.
+     */
+    @Query("SELECT u FROM User u WHERE u.username ILIKE %:query% AND u.id != :currentUserId")
+    Page<User> searchUsers(String query, UUID currentUserId, Pageable pageable);
 }
