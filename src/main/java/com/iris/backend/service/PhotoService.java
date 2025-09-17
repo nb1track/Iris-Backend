@@ -199,6 +199,10 @@ public class PhotoService {
         }
 
         // Annahme: Dein DTO wird so angepasst, dass es damit umgehen kann.
-        return new PhotoResponseDTO(photo.getId(), signedPhotoUrl, photo.getUploadedAt(), googlePlaceId, placeName, uploader.getId(), uploader.getUsername(), signedProfileImageUrl);
+        return new PhotoResponseDTO(photo.getId(),
+                signedPhotoUrl, photo.getUploadedAt(),
+                googlePlaceId, placeName, uploader.getId(),
+                uploader.getUsername(), signedProfileImageUrl,
+                photo.getLikeCount());
     }
 }

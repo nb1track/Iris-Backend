@@ -6,6 +6,7 @@ import com.iris.backend.dto.PhotoUploadRequestDTO;
 import com.iris.backend.dto.PhotoUploadResponse;
 import com.iris.backend.model.User;
 import com.iris.backend.repository.UserRepository;
+import com.iris.backend.service.PhotoLikeService;
 import com.iris.backend.service.PhotoService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +23,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 public class PhotoController {
 
     private final PhotoService photoService;
+    private final PhotoLikeService photoLikeService;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper; // Jackson's Tool zum Umwandeln
 
@@ -34,8 +36,9 @@ public class PhotoController {
      * @param userRepository the repository used for user-related data management
      * @param objectMapper the object mapper used for JSON serialization and deserialization
      */
-    public PhotoController(PhotoService photoService, UserRepository userRepository, ObjectMapper objectMapper) {
+    public PhotoController(PhotoService photoService, PhotoLikeService photoLikeService, UserRepository userRepository, ObjectMapper objectMapper) {
         this.photoService = photoService;
+        this.photoLikeService = photoLikeService;
         this.userRepository = userRepository;
         this.objectMapper = objectMapper;
     }
@@ -122,5 +125,19 @@ public class PhotoController {
             // Foto wurde nicht gefunden, antworte mit 404 Not Found
             return ResponseEntity.notFound().build();
         }
+    }
+
+    /**
+     *
+     * @param photoId
+     * @param currentUser
+     * @return
+     */
+    @PostMapping("/{photoId}/toggle-like")
+    public ResponseEntity<Void> toggleLikeOnPhoto(
+            @PathVariable UUID photoId,
+            @AuthenticationPrincipal User currentUser) {
+        photoLikeService.toggleLike(photoId, currentUser);
+        return ResponseEntity.ok().build();
     }
 }

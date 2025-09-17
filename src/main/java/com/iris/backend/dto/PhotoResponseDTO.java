@@ -24,5 +24,6 @@ public record PhotoResponseDTO(
         String placeName,
         UUID userId,
         String username,
-        String profileImageUrl
+        String profileImageUrl,
+        int likeCount
 ) {}
