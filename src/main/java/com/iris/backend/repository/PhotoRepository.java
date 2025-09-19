@@ -33,13 +33,12 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
     SELECT DISTINCT ph.*
     FROM
         photos ph,
-        -- KORREKTUR: Wir verwenden jetzt einen positionsbasierten Parameter (?)
-        jsonb_to_recordset(?::jsonb) AS h(latitude float, longitude float, "timestamp" timestptz)
+        jsonb_to_recordset(?2::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
     WHERE
-        ph.google_place_id = :placeId
+        ph.google_place_id = ?1
         AND ph.visibility = 'PUBLIC'
         AND ST_DWithin(
-            (SELECT location FROM google_places WHERE id = :placeId),
+            (SELECT location FROM google_places WHERE id = ?1),
             ST_MakePoint(h.longitude, h.latitude)::geography,
             500
         )
@@ -47,9 +46,8 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
     ORDER BY ph.uploaded_at DESC
     """, nativeQuery = true)
     List<Photo> findPhotosForPlaceMatchingHistoricalBatch(
-            @Param("placeId") Long placeId,
-            // KORREKTUR: Die @Param-Annotation für historyJson wird entfernt
-            String historyJson
+            Long placeId, // Parameter 1
+            String historyJson // Parameter 2
     );
 
 
