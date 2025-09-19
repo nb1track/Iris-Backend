@@ -43,18 +43,21 @@ public class PhotoService {
     private final ObjectMapper objectMapper;
 
     public PhotoService(
+            //Repositories
             PhotoRepository photoRepository,
             GooglePlaceRepository googlePlaceRepository,
             GcsStorageService gcsStorageService,
             UserRepository userRepository,
             TimelineEntryRepository timelineEntryRepository,
+            //Services
             @Lazy FriendshipService friendshipService,
             CustomPlaceRepository customPlaceRepository,
             PhotoLikeRepository photoLikeRepository,
             FcmService fcmService,
+            ObjectMapper objectMapper,
+            //Werte aus application.properties
             @Value("${gcs.bucket.photos.name}") String photosBucketName,
-            @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName,
-            ObjectMapper objectMapper
+            @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName
     ) {
         this.photoRepository = photoRepository;
         this.googlePlaceRepository = googlePlaceRepository;
@@ -65,9 +68,9 @@ public class PhotoService {
         this.customPlaceRepository = customPlaceRepository;
         this.photoLikeRepository = photoLikeRepository;
         this.fcmService = fcmService;
+        this.objectMapper = objectMapper;
         this.photosBucketName = photosBucketName;
         this.profileImagesBucketName = profileImagesBucketName;
-        this.objectMapper = objectMapper;
     }
 
     @Transactional
