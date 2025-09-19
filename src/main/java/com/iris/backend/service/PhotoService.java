@@ -16,7 +16,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -39,6 +40,7 @@ public class PhotoService {
     private final String photosBucketName;
     private final String profileImagesBucketName;
     private final FcmService fcmService;
+    private final ObjectMapper objectMapper;
 
     public PhotoService(
             PhotoRepository photoRepository,
@@ -51,7 +53,8 @@ public class PhotoService {
             PhotoLikeRepository photoLikeRepository,
             FcmService fcmService,
             @Value("${gcs.bucket.photos.name}") String photosBucketName,
-            @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName
+            @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName,
+            ObjectMapper objectMapper
     ) {
         this.photoRepository = photoRepository;
         this.googlePlaceRepository = googlePlaceRepository;
@@ -64,6 +67,7 @@ public class PhotoService {
         this.fcmService = fcmService;
         this.photosBucketName = photosBucketName;
         this.profileImagesBucketName = profileImagesBucketName;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -170,7 +174,6 @@ public class PhotoService {
         }
         try {
             // HINWEIS: ObjectMapper muss als Abhängigkeit im Konstruktor vorhanden sein.
-            ObjectMapper objectMapper = new ObjectMapper();
             String historyJson = objectMapper.writeValueAsString(history);
             List<Photo> photos = photoRepository.findPhotosForPlaceMatchingHistoricalBatch(placeId, historyJson);
             return photos.stream()
