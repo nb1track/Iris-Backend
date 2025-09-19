@@ -188,21 +188,26 @@ public class PhotoService {
 
         Integer googlePlaceId = null;
         String placeName = "Custom Location";
-        UUID customPlaceId = null;
 
         if (photo.getGooglePlace() != null) {
             googlePlaceId = photo.getGooglePlace().getId().intValue();
             placeName = photo.getGooglePlace().getName();
         } else if (photo.getCustomPlace() != null) {
-            customPlaceId = photo.getCustomPlace().getId();
             placeName = photo.getCustomPlace().getName();
         }
 
-        // Annahme: Dein DTO wird so angepasst, dass es damit umgehen kann.
-        return new PhotoResponseDTO(photo.getId(),
-                signedPhotoUrl, photo.getUploadedAt(),
-                googlePlaceId, placeName, uploader.getId(),
-                uploader.getUsername(), signedProfileImageUrl,
-                photo.getLikeCount());
+        int currentLikeCount = photoLikeRepository.countByIdPhotoId(photo.getId());
+
+        return new PhotoResponseDTO(
+                photo.getId(),
+                signedPhotoUrl,
+                photo.getUploadedAt(),
+                googlePlaceId,
+                placeName,
+                uploader.getId(),
+                uploader.getUsername(),
+                signedProfileImageUrl,
+                currentLikeCount // Hier wird die dynamisch geladene Anzahl übergeben
+        );
     }
 }

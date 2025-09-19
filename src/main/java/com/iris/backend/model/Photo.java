@@ -48,9 +48,6 @@ public class Photo {
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;
 
-    @Column(name = "like_count", nullable = false)
-    private int likeCount = 0; // Standardwert ist 0
-
     @PrePersist
     protected void onUpload() {
         uploadedAt = OffsetDateTime.now();

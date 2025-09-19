@@ -25,28 +25,25 @@ public class PhotoLikeService {
 
     @Transactional
     public void toggleLike(UUID photoId, User currentUser) {
-        // 1. Finde das Foto
-        Photo photo = photoRepository.findById(photoId)
-                .orElseThrow(() -> new RuntimeException("Photo not found with ID: " + photoId));
+        // Sicherstellen, dass das Foto existiert
+        if (!photoRepository.existsById(photoId)) {
+            throw new RuntimeException("Photo not found with ID: " + photoId);
+        }
 
         PhotoLikeId likeId = new PhotoLikeId(currentUser.getId(), photoId);
         Optional<PhotoLike> existingLike = photoLikeRepository.findById(likeId);
 
         if (existingLike.isPresent()) {
-            // 2a. Like existiert -> entfernen (unlike)
+            // Like existiert -> entfernen (unlike)
             photoLikeRepository.delete(existingLike.get());
-            photo.setLikeCount(Math.max(0, photo.getLikeCount() - 1)); // Zähler dekrementieren
         } else {
-            // 2b. Like existiert nicht -> hinzufügen (like)
+            // Like existiert nicht -> hinzufügen (like)
             PhotoLike newLike = new PhotoLike();
+            Photo photoReference = photoRepository.getReferenceById(photoId); // Holen einer Referenz ist effizienter
             newLike.setId(likeId);
             newLike.setUser(currentUser);
-            newLike.setPhoto(photo);
+            newLike.setPhoto(photoReference);
             photoLikeRepository.save(newLike);
-            photo.setLikeCount(photo.getLikeCount() + 1); // Zähler inkrementieren
         }
-
-        // 3. Den aktualisierten Zähler in der Photo-Tabelle speichern
-        photoRepository.save(photo);
     }
 }
