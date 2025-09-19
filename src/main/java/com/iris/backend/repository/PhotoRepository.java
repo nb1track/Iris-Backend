@@ -32,8 +32,12 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
     @Query(value = """
     SELECT DISTINCT ph.*
     FROM
-        photos ph,
-        jsonb_to_recordset(?2::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
+        photos ph
+    -- HIER IST DIE OPTIMIERUNG: Wir holen die User-Daten direkt mit
+    JOIN
+        users u ON ph.uploader_id = u.id,
+    -- Der Rest bleibt gleich
+        jsonb_to_recordset(?2::jsonb) AS h(latitude float, longitude float, "timestamp" timestptz)
     WHERE
         ph.google_place_id = ?1
         AND ph.visibility = 'PUBLIC'
@@ -46,8 +50,8 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
     ORDER BY ph.uploaded_at DESC
     """, nativeQuery = true)
     List<Photo> findPhotosForPlaceMatchingHistoricalBatch(
-            Long placeId, // Parameter 1
-            String historyJson // Parameter 2
+            Long placeId,
+            String historyJson
     );
 
 
