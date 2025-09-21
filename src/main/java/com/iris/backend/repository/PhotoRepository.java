@@ -30,39 +30,78 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
 
 
     /**
-     * HIER IST DIE KORREKTUR:
-     * Alle Parameter sind jetzt konsequent nummeriert (?1, ?2).
-     * Die @Param-Annotationen wurden entfernt, da sie nicht mehr benötigt werden.
+     * Findet historische "PUBLIC" Fotos für einen bestimmten Google Place.
+     * Die Methode gleicht eine Liste von historischen Standorten des Benutzers ab,
+     * um Fotos zu finden, die in einem bestimmten Zeit- und Ortsfenster aufgenommen wurden.
+     *
+     * @param googlePlaceId Die ID des Google Place.
+     * @param historyJson Ein JSON-String, der eine Liste von Breiten-, Längen- und Zeitstempel-Objekten enthält.
+     * @return Eine Liste von passenden Foto-Entitäten.
      */
     @Query(value = """
-WITH historical_points AS (
-    SELECT
-        (h ->> 'latitude')::float AS latitude,
-        (h ->> 'longitude')::float AS longitude,
-        (h ->> 'timestamp')::timestamptz AS "timestamp"
-    FROM
-        jsonb_array_elements(?2::jsonb) AS h
-)
-SELECT DISTINCT ph.*
-FROM
-    photos ph
-JOIN
-    historical_points h ON ST_DWithin(
-        (SELECT location FROM google_places WHERE id = ?1),
-        ST_MakePoint(h.longitude, h.latitude)::geography,
-        500
+    WITH historical_points AS (
+        SELECT
+            (h ->> 'latitude')::float AS latitude,
+            (h ->> 'longitude')::float AS longitude,
+            (h ->> 'timestamp')::timestamptz AS "timestamp"
+        FROM
+            jsonb_array_elements(?2::jsonb) AS h
     )
-WHERE
-    ph.google_place_id = ?1
-    AND ph.visibility = 'PUBLIC'
-    AND ph.uploaded_at BETWEEN (h."timestamp" - interval '5 hours') AND h."timestamp"
-ORDER BY ph.uploaded_at DESC
-""", nativeQuery = true)
-    List<Photo> findPhotosForPlaceMatchingHistoricalBatch(
-            Long placeId,
-            String historyJson
-    );
+    SELECT DISTINCT ph.*
+    FROM
+        photos ph
+    JOIN
+        historical_points h ON ST_DWithin(
+            (SELECT location FROM google_places WHERE id = ?1),
+            ST_MakePoint(h.longitude, h.latitude)::geography,
+            500  -- Suchradius in Metern
+        )
+    WHERE
+        ph.google_place_id = ?1
+        AND ph.visibility = 'PUBLIC'
+        AND ph.uploaded_at BETWEEN (h."timestamp" - interval '5 hours') AND h."timestamp"
+    ORDER BY ph.uploaded_at DESC
+    """, nativeQuery = true)
+    List<Photo> findPhotosForGooglePlaceMatchingHistoricalBatch(Long googlePlaceId, String historyJson);
 
+
+    /**
+     * Finds public photos for a specific custom place based on a given set of historical user locations
+     * and timestamps. It identifies photos that were uploaded within a certain geographic radius
+     * of the custom place's location and a specific time window relative to the user's historical data.
+     *
+     * @param customPlaceId The UUID of the custom place to match photos against.
+     * @param historyJson A JSON string representing a list of user historical location data,
+     *                    containing objects with latitude, longitude, and timestamp attributes.
+     * @return A list of photos that match the specified custom place and historical user data criteria.
+     */
+    @Query(value = """
+        WITH historical_points AS (
+            SELECT
+                (h ->> 'latitude')::float AS latitude,
+                (h ->> 'longitude')::float AS longitude,
+                (h ->> 'timestamp')::timestamptz AS "timestamp"
+            FROM
+                jsonb_array_elements(?2::jsonb) AS h
+        )
+        SELECT DISTINCT ph.*
+        FROM
+            photos ph
+        JOIN
+            custom_places cp ON ph.custom_place_id = cp.id
+        JOIN
+            historical_points h ON ST_DWithin(
+                cp.location,
+                ST_MakePoint(h.longitude, h.latitude)::geography,
+                cp.radius_meters
+            )
+        WHERE
+            ph.custom_place_id = ?1
+            AND ph.visibility = 'PUBLIC'
+            AND ph.uploaded_at BETWEEN (h."timestamp" - interval '5 hours') AND h."timestamp"
+        ORDER BY ph.uploaded_at DESC
+    """, nativeQuery = true)
+    List<Photo> findPhotosForCustomPlaceMatchingHistoricalBatch(UUID customPlaceId, String historyJson);
 
     List<Photo> findAllByUploaderInAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(
             List<User> uploaders,

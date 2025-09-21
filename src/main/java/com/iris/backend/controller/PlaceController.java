@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 
 import java.util.List;
+import java.util.UUID;
 
 
 @RestController
@@ -55,22 +56,29 @@ public class PlaceController {
         return ResponseEntity.ok(nearbyPlaces);
     }
 
-    /**
-     * Retrieves a list of historical photos for a specific place based on the provided historical search data.
-     *
-     * @param placeId the unique identifier of the place for which historical photos are being requested
-     * @param searchRequest the request payload containing historical search data, including a list of historical points
-     * @return a ResponseEntity containing a list of PhotoResponseDTO objects representing the historical photos
-     */
-    @PostMapping("/{placeId}/historical-photos")
-    public ResponseEntity<List<PhotoResponseDTO>> getHistoricalPhotosForPlace(
-            @PathVariable Long placeId,
+    @PostMapping("/google-places/{placeId}/historical-photos")
+    public ResponseEntity<List<PhotoResponseDTO>> getHistoricalPhotosForGooglePlace(
+            @PathVariable Long placeId, // Erwartet eine Long ID
             @RequestBody HistoricalSearchRequestDTO searchRequest
     ) {
-        List<PhotoResponseDTO> photos = photoService.findHistoricalPhotosForPlace(
+        List<PhotoResponseDTO> photos = photoService.findHistoricalPhotosForGooglePlace(
                 placeId,
                 searchRequest.history()
         );
         return ResponseEntity.ok(photos);
     }
+
+    // --- NEU: Eindeutiger Endpunkt für Custom Places ---
+    @PostMapping("/custom-places/{placeId}/historical-photos")
+    public ResponseEntity<List<PhotoResponseDTO>> getHistoricalPhotosForCustomPlace(
+            @PathVariable UUID placeId, // Erwartet eine UUID
+            @RequestBody HistoricalSearchRequestDTO searchRequest
+    ) {
+        List<PhotoResponseDTO> photos = photoService.findHistoricalPhotosForCustomPlace(
+                placeId,
+                searchRequest.history()
+        );
+        return ResponseEntity.ok(photos);
+    }
+
 }

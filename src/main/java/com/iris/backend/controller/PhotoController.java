@@ -25,7 +25,7 @@ public class PhotoController {
     private final PhotoService photoService;
     private final PhotoLikeService photoLikeService;
     private final UserRepository userRepository;
-    private final ObjectMapper objectMapper; // Jackson's Tool zum Umwandeln
+    private final ObjectMapper objectMapper;
 
     /**
      * Constructs a new instance of the PhotoController.
@@ -128,10 +128,14 @@ public class PhotoController {
     }
 
     /**
+     * Toggles the "like" status of a photo for the currently authenticated user.
+     * If the user has already liked the photo, this action will unlike it.
+     * Conversely, if the photo is not yet liked by the user, this action will like it.
      *
-     * @param photoId
-     * @param currentUser
-     * @return
+     * @param photoId the unique identifier of the photo whose like status is to be toggled
+     * @param currentUser the authenticated user performing the like/unlike operation,
+     *                    automatically injected by Spring Security
+     * @return a {@link ResponseEntity} with HTTP 200 (OK) status upon successful toggling
      */
     @PostMapping("/{photoId}/toggle-like")
     public ResponseEntity<Void> toggleLikeOnPhoto(

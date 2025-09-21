@@ -170,15 +170,22 @@ public class PhotoService {
         return photos.stream().map(this::toPhotoResponseDTO).collect(Collectors.toList());
     }
 
+    /**
+     * Retrieves a list of historical photos related to a specific Google Place, utilizing provided historical data points.
+     *
+     * @param googlePlaceId the unique identifier for the Google Place
+     * @param history the list of historical data points to match against when fetching photos
+     * @return a list of PhotoResponseDTO objects representing the photos associated with the given Google Place and historical data
+     */
     @Transactional(readOnly = true)
-    public List<PhotoResponseDTO> findHistoricalPhotosForPlace(Long placeId, List<HistoricalPointDTO> history) {
+    public List<PhotoResponseDTO> findHistoricalPhotosForGooglePlace(Long googlePlaceId, List<HistoricalPointDTO> history) {
         if (history == null || history.isEmpty()) {
             return List.of();
         }
         try {
-            // HINWEIS: ObjectMapper muss als Abhängigkeit im Konstruktor vorhanden sein.
             String historyJson = objectMapper.writeValueAsString(history);
-            List<Photo> photos = photoRepository.findPhotosForPlaceMatchingHistoricalBatch(placeId, historyJson);
+            // Ruft die neue, spezifische Repository-Methode auf
+            List<Photo> photos = photoRepository.findPhotosForGooglePlaceMatchingHistoricalBatch(googlePlaceId, historyJson);
             return photos.stream()
                     .map(this::toPhotoResponseDTO)
                     .collect(Collectors.toList());
@@ -187,6 +194,38 @@ public class PhotoService {
         }
     }
 
+    /**
+     * Finds and retrieves historical photos for a specific custom place based on the provided historical data points.
+     *
+     * @param customPlaceId the unique identifier of the custom place for which historical photos are to be retrieved
+     * @param history a list of historical data points represented as HistoricalPointDTO objects
+     * @return a list of PhotoResponseDTO containing the details of the historical photos, or an empty list if no applicable photos are found
+     */
+    @Transactional(readOnly = true)
+    public List<PhotoResponseDTO> findHistoricalPhotosForCustomPlace(UUID customPlaceId, List<HistoricalPointDTO> history) {
+        if (history == null || history.isEmpty()) {
+            return List.of();
+        }
+        try {
+            String historyJson = objectMapper.writeValueAsString(history);
+            // Ruft die neue, spezifische Repository-Methode auf
+            List<Photo> photos = photoRepository.findPhotosForCustomPlaceMatchingHistoricalBatch(customPlaceId, historyJson);
+            return photos.stream()
+                    .map(this::toPhotoResponseDTO)
+                    .collect(Collectors.toList());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Error processing historical photo data", e);
+        }
+    }
+
+    /**
+     * Converts a Photo entity to a PhotoResponseDTO, including generating signed URLs, resolving place details,
+     * and calculating the current like count for the photo.
+     *
+     * @param photo the photo entity to be converted into a PhotoResponseDTO
+     * @return a PhotoResponseDTO containing detailed information about the photo, including signed URLs,
+     *         uploader details, place information, and dynamically loaded like count
+     */
     public PhotoResponseDTO toPhotoResponseDTO(Photo photo) {
         User uploader = photo.getUploader();
         String signedPhotoUrl = gcsStorageService.generateSignedUrl(photosBucketName, photo.getStorageUrl(), 15, TimeUnit.MINUTES);
@@ -213,7 +252,7 @@ public class PhotoService {
                 uploader.getId(),
                 uploader.getUsername(),
                 signedProfileImageUrl,
-                currentLikeCount // Hier wird die dynamisch geladene Anzahl übergeben
+                currentLikeCount
         );
     }
 }
