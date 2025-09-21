@@ -35,26 +35,32 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
      * Die @Param-Annotationen wurden entfernt, da sie nicht mehr benötigt werden.
      */
     @Query(value = """
-    SELECT DISTINCT ph.*
+WITH historical_points AS (
+    SELECT
+        (h ->> 'latitude')::float AS latitude,
+        (h ->> 'longitude')::float AS longitude,
+        (h ->> 'timestamp')::timestamptz AS "timestamp"
     FROM
-        photos ph
-    JOIN
-        users u ON ph.uploader_id = u.id,
-        jsonb_to_recordset(?2::jsonb) AS h(latitude float, longitude float, "timestamp" timestamp)
-    WHERE
-        ph.google_place_id = ?1
-        AND ph.visibility = 'PUBLIC'
-        AND ST_DWithin(
-            (SELECT location FROM google_places WHERE id = ?1),
-            ST_MakePoint(h.longitude, h.latitude)::geography,
-            500
-        )
-        AND ph.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
-    ORDER BY ph.uploaded_at DESC
-    """, nativeQuery = true)
+        jsonb_array_elements(?2::jsonb) AS h
+)
+SELECT DISTINCT ph.*
+FROM
+    photos ph
+JOIN
+    historical_points h ON ST_DWithin(
+        (SELECT location FROM google_places WHERE id = ?1),
+        ST_MakePoint(h.longitude, h.latitude)::geography,
+        500
+    )
+WHERE
+    ph.google_place_id = ?1
+    AND ph.visibility = 'PUBLIC'
+    AND ph.uploaded_at BETWEEN (h."timestamp" - interval '5 hours') AND h."timestamp"
+ORDER BY ph.uploaded_at DESC
+""", nativeQuery = true)
     List<Photo> findPhotosForPlaceMatchingHistoricalBatch(
-            Long placeId,       // Dieser Parameter wird zu ?1
-            String historyJson  // Dieser Parameter wird zu ?2
+            Long placeId,
+            String historyJson
     );
 
 
