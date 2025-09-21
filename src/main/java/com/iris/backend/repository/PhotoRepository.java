@@ -33,10 +33,8 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
     SELECT DISTINCT ph.*
     FROM
         photos ph
-    -- HIER IST DIE OPTIMIERUNG: Wir holen die User-Daten direkt mit
     JOIN
         users u ON ph.uploader_id = u.id,
-    -- Der Rest bleibt gleich
         jsonb_to_recordset(?2::jsonb) AS h(latitude float, longitude float, "timestamp" timestptz)
     WHERE
         ph.google_place_id = ?1
