@@ -29,6 +29,11 @@ import java.util.UUID;
 public interface PhotoRepository extends JpaRepository<Photo, UUID> {
 
 
+    /**
+     * HIER IST DIE KORREKTUR:
+     * Alle Parameter sind jetzt konsequent nummeriert (?1, ?2).
+     * Die @Param-Annotationen wurden entfernt, da sie nicht mehr benötigt werden.
+     */
     @Query(value = """
     SELECT DISTINCT ph.*
     FROM
@@ -48,8 +53,8 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
     ORDER BY ph.uploaded_at DESC
     """, nativeQuery = true)
     List<Photo> findPhotosForPlaceMatchingHistoricalBatch(
-            Long placeId,
-            String historyJson
+            Long placeId,       // Dieser Parameter wird zu ?1
+            String historyJson  // Dieser Parameter wird zu ?2
     );
 
 
