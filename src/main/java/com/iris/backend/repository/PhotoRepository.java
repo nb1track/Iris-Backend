@@ -40,7 +40,7 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
         photos ph
     JOIN
         users u ON ph.uploader_id = u.id,
-        jsonb_to_recordset(?2::jsonb) AS h(latitude float, longitude float, "timestamp" timestptz)
+        jsonb_to_recordset(?2::jsonb) AS h(latitude float, longitude float, "timestamp" timestamp)
     WHERE
         ph.google_place_id = ?1
         AND ph.visibility = 'PUBLIC'
