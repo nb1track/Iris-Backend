@@ -37,6 +37,22 @@ public class FeedService {
         this.photosBucketName = photosBucketName;
     }
 
+    /**
+     * Generates a historical feed based on provided historical location points.
+     * Merges and processes results from Google Places data and custom places data,
+     * sorts them by their newest date in descending order, and converts them into
+     * a list of FeedPlaceDTO objects.
+     *
+     * @param history a list of {@link HistoricalPointDTO} objects representing
+     *                historical location points. Each point includes latitude,
+     *                longitude, and timestamp. If the list is null or empty, an
+     *                empty list is returned.
+     * @return a list of {@link FeedPlaceDTO} objects representing the generated
+     *         historical feed. If no results are found, an empty list is returned.
+     *         Each object contains information about a place, such as its name,
+     *         address, dates, and other attributes.
+     * @throws RuntimeException if an error occurs during JSON processing.
+     */
     @Transactional(readOnly = true)
     public List<FeedPlaceDTO> generateHistoricalFeed(List<HistoricalPointDTO> history) {
         if (history == null || history.isEmpty()) {
