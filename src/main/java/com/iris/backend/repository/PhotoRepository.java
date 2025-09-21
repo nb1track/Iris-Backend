@@ -39,30 +39,33 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
      * @return Eine Liste von passenden Foto-Entitäten.
      */
     @Query(value = """
-    WITH historical_points AS (
-        SELECT
-            (h ->> 'latitude')::float AS latitude,
-            (h ->> 'longitude')::float AS longitude,
-            (h ->> 'timestamp')::timestamptz AS "timestamp"
-        FROM
-            jsonb_array_elements(?2::jsonb) AS h
-    )
-    SELECT DISTINCT ph.*
+WITH historical_points AS (
+    SELECT
+        (h ->> 'latitude')::float AS latitude,
+        (h ->> 'longitude')::float AS longitude,
+        (h ->> 'timestamp')::timestamptz AS "timestamp"
     FROM
-        photos ph
-    JOIN
-        historical_points h ON ST_DWithin(
-            (SELECT location FROM google_places WHERE id = ?1),
-            ST_MakePoint(h.longitude, h.latitude)::geography,
-            500  -- Suchradius in Metern
-        )
-    WHERE
-        ph.google_place_id = ?1
-        AND ph.visibility = 'PUBLIC'
-        AND ph.uploaded_at BETWEEN (h."timestamp" - interval '5 hours') AND h."timestamp"
-    ORDER BY ph.uploaded_at DESC
-    """, nativeQuery = true)
-    List<Photo> findPhotosForGooglePlaceMatchingHistoricalBatch(Long googlePlaceId, String historyJson);
+        jsonb_array_elements(CAST(:historyJson AS jsonb)) AS h
+)
+SELECT DISTINCT ph.*
+FROM
+    photos ph
+JOIN
+    historical_points h ON ST_DWithin(
+        (SELECT location FROM google_places WHERE id = :googlePlaceId),
+        ST_MakePoint(h.longitude, h.latitude)::geography,
+        500
+    )
+WHERE
+    ph.google_place_id = :googlePlaceId
+    AND ph.visibility = 'PUBLIC'
+    AND ph.uploaded_at BETWEEN (h."timestamp" - interval '5 hours') AND h."timestamp"
+ORDER BY ph.uploaded_at DESC
+""", nativeQuery = true)
+    List<Photo> findPhotosForGooglePlaceMatchingHistoricalBatch(
+            @Param("googlePlaceId") Long googlePlaceId,
+            @Param("historyJson") String historyJson
+    );
 
 
     /**
