@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iris.backend.dto.HistoricalPointDTO;
 import com.iris.backend.dto.PhotoResponseDTO;
+import com.iris.backend.dto.feed.GalleryPlaceType;
 import com.iris.backend.model.*;
 import com.iris.backend.model.enums.PhotoVisibility;
 import com.iris.backend.repository.*;
@@ -219,35 +220,62 @@ public class PhotoService {
     }
 
     /**
-     * Converts a Photo entity to a PhotoResponseDTO, including generating signed URLs, resolving place details,
-     * and calculating the current like count for the photo.
+     * Wandelt eine Photo-Entity in das (jetzt saubere) PhotoResponseDTO um.
+     * Diese Methode befüllt die neuen polymorphen Place-Felder korrekt.
      *
      * @param photo the photo entity to be converted into a PhotoResponseDTO
      * @return a PhotoResponseDTO containing detailed information about the photo, including signed URLs,
-     *         uploader details, place information, and dynamically loaded like count
+     * uploader details, place information (polymorphic), and dynamically loaded like count
      */
     public PhotoResponseDTO toPhotoResponseDTO(Photo photo) {
         User uploader = photo.getUploader();
-        String signedPhotoUrl = gcsStorageService.generateSignedUrl(photosBucketName, photo.getStorageUrl(), 15, TimeUnit.MINUTES);
-        String signedProfileImageUrl = gcsStorageService.generateSignedUrl(profileImagesBucketName, uploader.getProfileImageUrl(), 15, TimeUnit.MINUTES);
 
-        Integer googlePlaceId = null;
-        String placeName = "Custom Location";
+        // 1. Signierte URLs generieren
+        String signedPhotoUrl = gcsStorageService.generateSignedUrl(
+                photosBucketName,
+                photo.getStorageUrl(),
+                15,
+                TimeUnit.MINUTES
+        );
+        String signedProfileImageUrl = gcsStorageService.generateSignedUrl(
+                profileImagesBucketName,
+                uploader.getProfileImageUrl(),
+                15,
+                TimeUnit.MINUTES
+        );
+
+        // 2. NEUE Logik: Polymorphe Place-Informationen bestimmen
+        GalleryPlaceType placeType = null;
+        Long googlePlaceId = null;
+        UUID customPlaceId = null;
+        String placeName = "Friends Feed"; // Standard, falls weder POI noch Spot
 
         if (photo.getGooglePlace() != null) {
-            googlePlaceId = photo.getGooglePlace().getId().intValue();
+            placeType = GalleryPlaceType.GOOGLE_POI;
+            googlePlaceId = photo.getGooglePlace().getId();
             placeName = photo.getGooglePlace().getName();
         } else if (photo.getCustomPlace() != null) {
+            placeType = GalleryPlaceType.IRIS_SPOT;
+            customPlaceId = photo.getCustomPlace().getId();
             placeName = photo.getCustomPlace().getName();
         }
+        // (Wenn beide null sind, war es ein "FRIENDS" Upload ohne Ort -> placeName bleibt "Friends Feed")
 
+        // 3. Like-Anzahl holen (unverändert)
         int currentLikeCount = photoLikeRepository.countByIdPhotoId(photo.getId());
 
+        // 4. Das NEUE DTO zurückgeben
         return new PhotoResponseDTO(
                 photo.getId(),
                 signedPhotoUrl,
                 photo.getUploadedAt(),
+
+                // --- NEUE FELDER ---
+                placeType,
                 googlePlaceId,
+                customPlaceId,
+                // --- ENDE NEUE FELDER ---
+
                 placeName,
                 uploader.getId(),
                 uploader.getUsername(),
