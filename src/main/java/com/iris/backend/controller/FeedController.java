@@ -1,9 +1,8 @@
 package com.iris.backend.controller;
 
-import com.iris.backend.dto.FeedPlaceDTO;
+import com.iris.backend.dto.feed.GalleryFeedItemDTO;
 import com.iris.backend.dto.HistoricalSearchRequestDTO;
-import com.iris.backend.dto.PlaceDTO;
-import com.iris.backend.service.FeedService;
+import com.iris.backend.service.HistoricalFeedService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,17 +15,17 @@ import java.util.List;
 @RequestMapping("/api/v1/feed")
 public class FeedController {
 
-    private final FeedService feedService;
+    private final HistoricalFeedService historicalFeedService;
 
-    public FeedController(FeedService feedService) {
-        this.feedService = feedService;
+    public FeedController(HistoricalFeedService historicalFeedService) {
+        this.historicalFeedService = historicalFeedService;
     }
 
     @PostMapping("/historical")
-    public ResponseEntity<List<FeedPlaceDTO>> getHistoricalFeed(
-            @RequestBody HistoricalSearchRequestDTO searchRequest) {
+    public ResponseEntity<List<GalleryFeedItemDTO>> getHistoricalFeed(
+                                                                       @RequestBody HistoricalSearchRequestDTO searchRequest) {
 
-        List<FeedPlaceDTO> feed = feedService.generateHistoricalFeed(searchRequest.history());
+        List<GalleryFeedItemDTO> feed = historicalFeedService.generateHistoricalFeed(searchRequest.history());
         return ResponseEntity.ok(feed);
     }
 }

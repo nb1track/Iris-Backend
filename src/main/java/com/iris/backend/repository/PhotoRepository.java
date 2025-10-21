@@ -10,6 +10,7 @@ import com.iris.backend.model.User;
 import com.iris.backend.model.enums.PhotoVisibility;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -123,4 +124,14 @@ ORDER BY ph.uploaded_at DESC
     @Query("SELECT DISTINCT p.uploader FROM Photo p WHERE p.customPlace = :customPlace")
     List<User> findDistinctUploadersByCustomPlace(CustomPlace customPlace);
 
+    Optional<Photo> findFirstByGooglePlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(Long googlePlaceId, PhotoVisibility visibility, OffsetDateTime now);
+
+    // Für Foto-Anzahl GooglePlace
+    long countByGooglePlaceIdAndVisibilityAndExpiresAtAfter(Long googlePlaceId, PhotoVisibility visibility, OffsetDateTime now);
+
+    // Für Cover-Bild CustomPlace
+    Optional<Photo> findFirstByCustomPlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(UUID customPlaceId, PhotoVisibility visibility, OffsetDateTime now);
+
+    // Für Foto-Anzahl CustomPlace
+    long countByCustomPlaceIdAndVisibilityAndExpiresAtAfter(UUID customPlaceId, PhotoVisibility visibility, OffsetDateTime now);
 }

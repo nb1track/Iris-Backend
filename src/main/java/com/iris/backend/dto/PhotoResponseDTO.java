@@ -1,5 +1,7 @@
 package com.iris.backend.dto;
 
+import com.iris.backend.dto.feed.GalleryPlaceType;
+
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -20,8 +22,14 @@ public record PhotoResponseDTO(
         UUID photoId,
         String storageUrl,
         OffsetDateTime timestamp,
-        Integer placeId,
+
+        // --- NEUE STRUKTUR ---
+        GalleryPlaceType placeType, // GOOGLE_POI oder IRIS_SPOT
+        Long googlePlaceId,       // Ist gesetzt, wenn Typ = GOOGLE_POI
+        UUID customPlaceId,         // Ist gesetzt, wenn Typ = IRIS_SPOT
         String placeName,
+        // --- ENDE ---
+
         UUID userId,
         String username,
         String profileImageUrl,

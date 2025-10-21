@@ -2,17 +2,12 @@ package com.iris.backend.controller;
 
 import com.iris.backend.dto.HistoricalSearchRequestDTO;
 import com.iris.backend.dto.PhotoResponseDTO;
-import com.iris.backend.dto.PlaceDTO;
-import com.iris.backend.service.GoogleApiService;
+import com.iris.backend.dto.feed.GalleryFeedItemDTO;
 import com.iris.backend.service.PhotoService;
-import com.iris.backend.service.PlaceService;
+import com.iris.backend.service.GalleryFeedService;
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import com.iris.backend.dto.CreatePlaceRequestDTO;
-import com.iris.backend.model.User;
-import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.UUID;
@@ -22,40 +17,34 @@ import java.util.UUID;
 @RequestMapping("/api/v1/places")
 public class PlaceController {
 
-    private final GoogleApiService googleApiService;
     private final PhotoService photoService;
-    private final PlaceService placeService;
+    private final GalleryFeedService galleryFeedService; // NEU
 
-
-    /**
-     * Constructs a new PlaceController with the provided GoogleApiService and PhotoService.
-     *
-     * @param googleApiService the service used to handle interactions with the Google API
-     * @param photoService the service used to handle photo-related operations
-     */
-    public PlaceController(GoogleApiService googleApiService,  PhotoService photoService, PlaceService placeService) {
-        this.googleApiService = googleApiService;
+    // Konstruktor bereinigt: GoogleApiService und PlaceService sind raus.
+    public PlaceController(PhotoService photoService, GalleryFeedService galleryFeedService) {
         this.photoService = photoService;
-        this.placeService = placeService;
+        this.galleryFeedService = galleryFeedService;
     }
 
     /**
-     * Retrieves a list of nearby places based on the provided geographic coordinates.
-     *
-     * @param latitude the latitude of the location to search for nearby places
-     * @param longitude the longitude of the location to search for nearby places
-     * @return a ResponseEntity containing a list of PlaceDTO objects representing nearby places
+     * NEU: Holt den "Entdeckte Spots"-Feed (POIs + Iris Spots).
+     * Nutzt den neuen GalleryFeedService und das GalleryFeedItemDTO.
+     * Ersetzt die alte getNearbyPlaces-Logik.
      */
     @GetMapping("/nearby")
-    public ResponseEntity<List<PlaceDTO>> getNearbyPlaces(
-            @RequestParam double latitude,
-            @RequestParam double longitude) {
+    public ResponseEntity<List<GalleryFeedItemDTO>> getNearbyPlaces( // NEUER RÜCKGABETYP
+                                                                     @RequestParam double latitude,
+                                                                     @RequestParam double longitude) {
 
-        // KORREKTUR: Rufe die umbenannte und korrekte Methode im Service auf.
-        List<PlaceDTO> nearbyPlaces = placeService.findActiveNearbyPlaces(latitude, longitude);
-        return ResponseEntity.ok(nearbyPlaces);
+        // NEUE LOGIK: Ruft den neuen zentralen Service auf
+        List<GalleryFeedItemDTO> discoveredSpots = galleryFeedService.getDiscoveredSpots(latitude, longitude);
+        return ResponseEntity.ok(discoveredSpots);
     }
 
+    /**
+     * Holt historische Fotos für einen Google Place.
+     * Diese Methode bleibt unverändert, da sie den PhotoService nutzt.
+     */
     @PostMapping("/google-places/{placeId}/historical-photos")
     public ResponseEntity<List<PhotoResponseDTO>> getHistoricalPhotosForGooglePlace(
             @PathVariable Long placeId, // Erwartet eine Long ID
@@ -68,7 +57,11 @@ public class PlaceController {
         return ResponseEntity.ok(photos);
     }
 
-    // --- NEU: Eindeutiger Endpunkt für Custom Places ---
+
+    /**
+     * Holt historische Fotos für einen Custom Place (Iris Spot).
+     * Diese Methode bleibt unverändert, da sie den PhotoService nutzt.
+     */
     @PostMapping("/custom-places/{placeId}/historical-photos")
     public ResponseEntity<List<PhotoResponseDTO>> getHistoricalPhotosForCustomPlace(
             @PathVariable UUID placeId, // Erwartet eine UUID
