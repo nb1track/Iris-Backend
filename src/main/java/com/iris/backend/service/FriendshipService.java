@@ -27,46 +27,30 @@ import java.util.stream.Stream;
 @Service
 public class FriendshipService {
 
-    private static final Logger logger = LoggerFactory.getLogger(FriendshipService.class);
-
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
-    private final GcsStorageService gcsStorageService;
-    private final String profileImagesBucketName;
+    private final GcsStorageService gcsStorageService; // NEUE ABHÄNGIGKEIT
 
-    private static final double MAX_DISTANCE_METERS = 50.0; // Max. 50 Meter Entfernung
+    @Value("${gcs.bucket.profile-images.name}") // NEU: Bucket-Name laden
+    private String profileImagesBucketName;
+
+    private static final double MAX_DISTANCE_METERS = 50.0;
 
     /**
-     * Constructs a new instance of the FriendshipService.
-     *
-     * @param userRepository the repository used for accessing and managing User entities
-     * @param friendshipRepository the repository used for accessing and managing Friendship entities
+     * Konstruktor aktualisiert mit GcsStorageService
      */
-    public FriendshipService(
-            UserRepository userRepository,
-            FriendshipRepository friendshipRepository,
-            GcsStorageService gcsStorageService,
-            // NEU: Bucket-Namen aus der Konfiguration laden
-            @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName
-    ) {
+    public FriendshipService(UserRepository userRepository,
+                             FriendshipRepository friendshipRepository,
+                             GcsStorageService gcsStorageService) { // NEU
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
-        this.gcsStorageService = gcsStorageService;
-        // NEU: Bucket-Namen speichern
-        this.profileImagesBucketName = profileImagesBucketName;
+        this.gcsStorageService = gcsStorageService; // NEU
     }
-
 
     /**
      * Retrieves the list of friends for a specified user as Data Transfer Object (DTO) representations.
      *
-     * This method fetches all friendships where the given user is either User One or User Two
-     * and the friendship status is 'ACCEPTED'. It then transforms the associated user entities
-     * into DTOs containing their id and username.
-     *
-     * @param userId the unique identifier of the user for whom the friend list is to be retrieved
-     * @return a list of UserDTO objects representing the user's friends
-     * @throws RuntimeException if the user with the specified ID is not found
+     * (Methode aktualisiert, um signierte Profilbild-URLs zu generieren)
      */
     public List<UserDTO> getFriendsAsDTO(UUID userId) {
         User user = userRepository.findById(userId)
@@ -76,21 +60,32 @@ public class FriendshipService {
                 .findByUserOneAndStatusOrUserTwoAndStatus(user, FriendshipStatus.ACCEPTED, user, FriendshipStatus.ACCEPTED);
 
         return friendships.stream()
-                .map(friendship -> friendship.getUserOne().getId().equals(userId) ? friendship.getUserTwo() : friendship.getUserOne())
-                .map(this::toUserDTOWithSignedUrl)
+                .map(friendship -> {
+                    User friend = friendship.getUserOne().getId().equals(userId) ? friendship.getUserTwo() : friendship.getUserOne();
+
+                    // --- NEUE LOGIK (Signierte URL) ---
+                    String signedProfileUrl = null;
+                    String objectName = friend.getProfileImageUrl();
+
+                    if (objectName != null && !objectName.isBlank()) {
+                        signedProfileUrl = gcsStorageService.generateSignedUrl(
+                                profileImagesBucketName,
+                                objectName,
+                                15,
+                                TimeUnit.MINUTES
+                        );
+                    }
+                    // --- ENDE NEUE LOGIK ---
+
+                    // Konstruktor mit 3 Argumenten
+                    return new UserDTO(friend.getId(), friend.getUsername(), signedProfileUrl);
+                })
                 .collect(Collectors.toList());
     }
 
     /**
      * Retrieves the list of friends for a specified user as entity representations.
-     *
-     * This method retrieves all friendships where the given user is either User One or User Two
-     * and the friendship status is 'ACCEPTED'. It then returns the associated user entities
-     * representing the user's friends.
-     *
-     * @param userId the unique identifier of the user for whom the friend list is to be retrieved
-     * @return a list of User entities representing the user's friends
-     * @throws RuntimeException if the user with the specified ID is not found
+     * (Diese Methode bleibt unverändert, da sie keine DTOs verwendet)
      */
     public List<User> getFriendsAsEntities(UUID userId) {
         User user = userRepository.findById(userId)
@@ -119,53 +114,38 @@ public class FriendshipService {
      * @throws SecurityException if the users are not within the maximum allowed distance
      */
     public void sendFriendRequest(User requester, UUID addresseeId) {
-        logger.info("--- [sendFriendRequest] Starting friend request from {} to {}", requester.getUsername(), addresseeId);
-
         User addressee = userRepository.findById(addresseeId)
                 .orElseThrow(() -> new RuntimeException("Addressee not found"));
-        logger.info("--- [sendFriendRequest] Addressee {} found.", addressee.getUsername());
 
         // Standort-Check
         Point requesterLocation = requester.getLastLocation();
         Point addresseeLocation = addressee.getLastLocation();
 
         if (requesterLocation == null || addresseeLocation == null) {
-            logger.error("--- [sendFriendRequest] Location not available for one or both users.");
             throw new IllegalStateException("User location not available.");
         }
-        logger.info("--- [sendFriendRequest] Locations are available for both users.");
 
         // Zeit-Check
         long requesterLocAge = Duration.between(requester.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes();
         long addresseeLocAge = Duration.between(addressee.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes();
-        logger.info("--- [sendFriendRequest] Location age check: Requester {} mins, Addressee {} mins.", requesterLocAge, addresseeLocAge);
 
         if (requesterLocAge > 5 || addresseeLocAge > 5) {
-            logger.warn("--- [sendFriendRequest] Location is outdated for one or both users.");
             throw new IllegalStateException("User location is outdated.");
         }
 
         // Distanz-Check
         double distance = requesterLocation.distance(addresseeLocation);
-        logger.info("--- [sendFriendRequest] Calculated distance is {} meters.", distance);
-
         if (distance > MAX_DISTANCE_METERS) {
-            logger.warn("--- [sendFriendRequest] Distance check FAILED. Distance {} is greater than max {}.", distance, MAX_DISTANCE_METERS);
             throw new SecurityException("Users are not close enough to send a friend request.");
         }
-        logger.info("--- [sendFriendRequest] Distance check PASSED.");
 
         User userOne = requester.getId().compareTo(addressee.getId()) < 0 ? requester : addressee;
         User userTwo = requester.getId().compareTo(addressee.getId()) < 0 ? addressee : requester;
 
         // Prüfe, ob bereits eine Beziehung existiert
         if (friendshipRepository.existsByUserOneAndUserTwo(userOne, userTwo)) {
-            logger.warn("--- [sendFriendRequest] Friendship already exists. Aborting.");
-            // Wirf einen Fehler, den der Controller fangen und an die App senden kann
             throw new IllegalStateException("A friendship or pending request already exists between these users.");
         }
-        logger.info("--- [sendFriendRequest] No existing friendship found. Proceeding.");
-        // --- ENDE NEUE PRÜFUNG ---
 
         // Neue Freundschaftsanfrage erstellen
         Friendship newFriendship = new Friendship();
@@ -175,7 +155,6 @@ public class FriendshipService {
         newFriendship.setActionUser(requester);
 
         friendshipRepository.save(newFriendship);
-        logger.info("--- [sendFriendRequest] Successfully saved new friend request.");
     }
 
     /**
@@ -355,7 +334,6 @@ public class FriendshipService {
 
         // 3. Wenn alle Checks bestanden sind, lösche den Eintrag komplett.
         friendshipRepository.deleteById(friendshipId);
-        logger.info("--- [rejectFriendRequest] Successfully deleted friendship request with ID: {}", friendshipId);
     }
 
     /**
@@ -379,6 +357,5 @@ public class FriendshipService {
         }
 
         friendshipRepository.delete(friendship);
-        logger.info("--- [removeFriend] Successfully removed friendship between {} and {}", currentUser.getUsername(), friendToRemove.getUsername());
     }
 }

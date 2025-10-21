@@ -2,7 +2,9 @@ package com.iris.backend.controller;
 
 import com.iris.backend.dto.HistoricalSearchRequestDTO;
 import com.iris.backend.dto.PhotoResponseDTO;
+import com.iris.backend.dto.PlaceDTO;
 import com.iris.backend.dto.feed.GalleryFeedItemDTO;
+import com.iris.backend.service.GoogleApiService;
 import com.iris.backend.service.PhotoService;
 import com.iris.backend.service.GalleryFeedService;
 
@@ -18,12 +20,15 @@ import java.util.UUID;
 public class PlaceController {
 
     private final PhotoService photoService;
-    private final GalleryFeedService galleryFeedService; // NEU
+    private final GalleryFeedService galleryFeedService;
+    private final GoogleApiService googleApiService;
 
-    // Konstruktor bereinigt: GoogleApiService und PlaceService sind raus.
-    public PlaceController(PhotoService photoService, GalleryFeedService galleryFeedService) {
+    public PlaceController(PhotoService photoService,
+                           GalleryFeedService galleryFeedService,
+                           GoogleApiService googleApiService) {
         this.photoService = photoService;
         this.galleryFeedService = galleryFeedService;
+        this.googleApiService = googleApiService;
     }
 
     /**
@@ -72,6 +77,26 @@ public class PlaceController {
                 searchRequest.history()
         );
         return ResponseEntity.ok(photos);
+    }
+
+    /**
+     * NEU: Holt die verfügbaren Google POIs (Points of Interest) für das Tagging.
+     * Das Frontend ruft dies auf, bevor es ein Foto hochlädt,
+     * um die 'googlePlaceId' (Long) zu erhalten.
+     *
+     * @param latitude  Aktuelle Latitude des Benutzers
+     * @param longitude Aktuelle Longitude des Benutzers
+     * @return Eine Liste von PlaceDTOs (die unsere interne Long-ID enthalten)
+     */
+    @GetMapping("/google-pois")
+    public ResponseEntity<List<PlaceDTO>> getAvailableGooglePois(
+            @RequestParam double latitude,
+            @RequestParam double longitude) {
+
+        // Ruft den GoogleApiService auf, der die POIs findet,
+        // in unserer DB speichert/updated und als PlaceDTO zurückgibt.
+        List<PlaceDTO> nearbyPois = googleApiService.findNearbyPlaces(latitude, longitude);
+        return ResponseEntity.ok(nearbyPois);
     }
 
 }
