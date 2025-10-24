@@ -42,7 +42,7 @@ public class PlaceController {
                                                                      @RequestParam double longitude) {
 
         // NEUE LOGIK: Ruft den neuen zentralen Service auf
-        List<GalleryFeedItemDTO> discoveredSpots = galleryFeedService.getDiscoveredSpots(latitude, longitude);
+        List<GalleryFeedItemDTO> discoveredSpots = galleryFeedService.getDiscoverFeed(latitude, longitude);
         return ResponseEntity.ok(discoveredSpots);
     }
 
@@ -80,23 +80,21 @@ public class PlaceController {
     }
 
     /**
-     * NEU: Holt die verfügbaren Google POIs (Points of Interest) für das Tagging.
-     * Das Frontend ruft dies auf, bevor es ein Foto hochlädt,
-     * um die 'googlePlaceId' (Long) zu erhalten.
+     * Holt alle verfügbaren Orte (Google POIs + Iris Spots) für das Tagging
+     * auf der Kamera-Seite.
+     * Diese Abfrage ist schnell und gibt Orte AUCH OHNE Fotos zurück.
      *
      * @param latitude  Aktuelle Latitude des Benutzers
      * @param longitude Aktuelle Longitude des Benutzers
-     * @return Eine Liste von PlaceDTOs (die unsere interne Long-ID enthalten)
+     * @return Eine Liste von Orten (DTOs), die zum Taggen verfügbar sind.
      */
-    @GetMapping("/google-pois")
-    public ResponseEntity<List<PlaceDTO>> getAvailableGooglePois(
+    @GetMapping("/taggable")
+    public ResponseEntity<List<GalleryFeedItemDTO>> getTaggablePlaces(
             @RequestParam double latitude,
             @RequestParam double longitude) {
 
-        // Ruft den GoogleApiService auf, der die POIs findet,
-        // in unserer DB speichert/updated und als PlaceDTO zurückgibt.
-        List<PlaceDTO> nearbyPois = googleApiService.findNearbyPlaces(latitude, longitude);
-        return ResponseEntity.ok(nearbyPois);
+        // Ruft die NEUE, SCHNELLE Service-Methode auf
+        List<GalleryFeedItemDTO> taggablePlaces = galleryFeedService.getTaggablePlaces(latitude, longitude);
+        return ResponseEntity.ok(taggablePlaces);
     }
-
 }

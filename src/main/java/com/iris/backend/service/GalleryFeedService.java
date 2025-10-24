@@ -26,7 +26,8 @@ import java.util.stream.Stream;
 /**
  * Neuer, zentraler Service zur Erstellung aller "Public Gallery" Feeds.
  * Dieser Service ist verantwortlich für die Umwandlung von Entities
- * (GooglePlace, CustomPlace) in das vereinheitlichte GalleryFeedItemDTO.
+ * (GooglePlace, CustomPlace) in das vereinheitlichte GalleryFeedItemDTO
+ * und unterstützt alle Anwendungsfälle.
  */
 @Service
 @Transactional(readOnly = true)
@@ -37,8 +38,19 @@ public class GalleryFeedService {
     private final PhotoRepository photoRepository;
     private final GcsStorageService gcsStorageService;
 
-    @Value("${gcs.bucket.photos.name}")
+    @Value("${gcs.bucket.name}")
     private String photosBucketName;
+
+    /**
+     * Interner Record zur Bündelung von Foto-Aggregationsergebnissen.
+     */
+    private record AggregatedPhotoInfo(long count, String coverImageUrl, OffsetDateTime newestPhotoTimestamp) {
+        /**
+         * Statische Konstante für den schnellen "Taggable Places"-Feed,
+         * der keine Foto-Infos benötigt.
+         */
+        public static final AggregatedPhotoInfo EMPTY = new AggregatedPhotoInfo(0, null, null);
+    }
 
     public GalleryFeedService(CustomPlaceRepository customPlaceRepository,
                               GooglePlaceRepository googlePlaceRepository,
@@ -51,90 +63,113 @@ public class GalleryFeedService {
     }
 
     /**
-     * Holt den "Trending Spots"-Feed.
-     * (Implementiert Logik von CustomPlaceController.getTrendingSpots)
+     * Holt den "Entdeckt"-Feed (deine "irisShareSpots"-Page).
+     * Zeigt nur Orte an, die aktive, öffentliche Fotos enthalten.
+     */
+    public List<GalleryFeedItemDTO> getDiscoverFeed(double latitude, double longitude) {
+        List<GooglePlace> googlePlaces = googlePlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
+        List<CustomPlace> customPlaces = customPlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
+
+        Stream<GalleryFeedItemDTO> combinedStream = Stream.concat(
+                googlePlaces.stream().map(place -> convertToFeedItem(place, true)), // true = Foto-Infos laden
+                customPlaces.stream().map(place -> convertToFeedItem(place, true))  // true = Foto-Infos laden
+        );
+
+        Comparator<GalleryFeedItemDTO> comparator = Comparator.comparing(GalleryFeedItemDTO::name);
+
+        return combinedStream
+                .filter(item -> item.photoCount() > 0)
+                .sorted(comparator)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Holt alle Orte (Google POIs und Iris Spots) in der Nähe eines Benutzers,
+     * die zum Taggen eines Fotos verfügbar sind (deine "cameraPage").
+     */
+    public List<GalleryFeedItemDTO> getTaggablePlaces(double latitude, double longitude) {
+        List<GooglePlace> googlePlaces = googlePlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
+        List<CustomPlace> customPlaces = customPlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
+
+        Stream<GalleryFeedItemDTO> combinedStream = Stream.concat(
+                googlePlaces.stream().map(place -> convertToFeedItem(place, false)), // false = KEINE Foto-Infos laden
+                customPlaces.stream().map(place -> convertToFeedItem(place, false))  // false = KEINE Foto-Infos laden
+        );
+
+        return combinedStream
+                .sorted(Comparator.comparing(GalleryFeedItemDTO::name))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Holt alle "Trending" Iris Spots.
+     * (Implementiert die Logik für CustomPlaceController)
      */
     public List<GalleryFeedItemDTO> getTrendingSpots() {
-        // 1. Hole alle Entities, die 'trending' sind
-        List<CustomPlace> trendingPlaces = customPlaceRepository.findAllByIsTrendingTrueOrderByCreatedAtDesc();
-
-        // 2. Wandle sie in das Feed-DTO um
-        return trendingPlaces.stream()
-                .map(this::mapToFeedItemDTO) // private Mapper-Methode nutzen
+        return customPlaceRepository.findAllByIsTrendingTrueOrderByCreatedAtDesc()
+                .stream()
+                .map(place -> convertToFeedItem(place, true)) // true = Foto-Infos laden
+                .filter(item -> item.photoCount() > 0) // Annahme: Trending Spots sollen auch nur angezeigt werden, wenn sie Fotos haben
                 .collect(Collectors.toList());
     }
 
     /**
-     * Holt den "Meine erstellten Spots"-Feed.
-     * (Implementiert Logik von CustomPlaceController.getMyCreatedSpots)
+     * Holt alle vom eingeloggten User erstellten Iris Spots.
+     * (Implementiert die Logik für CustomPlaceController)
      */
     public List<GalleryFeedItemDTO> getMyCreatedSpots(User currentUser) {
-        // 1. Hole alle Entities für den Creator
-        List<CustomPlace> userPlaces = customPlaceRepository.findAllByCreatorOrderByCreatedAtDesc(currentUser);
-
-        // 2. Wandle sie in das Feed-DTO um
-        return userPlaces.stream()
-                .map(this::mapToFeedItemDTO) // private Mapper-Methode nutzen
+        return customPlaceRepository.findAllByCreatorOrderByCreatedAtDesc(currentUser)
+                .stream()
+                .map(place -> convertToFeedItem(place, true)) // true = Foto-Infos laden
                 .collect(Collectors.toList());
     }
 
     /**
-     * Holt den "Entdeckte Spots"-Feed (POIs + Iris Spots).
-     * (Implementiert Logik von PlaceController.getNearbyPlaces)
+     * Private Helfermethode: Konvertiert ein GooglePlace-Entity in ein DTO.
      */
-    public List<GalleryFeedItemDTO> getDiscoveredSpots(double latitude, double longitude) {
+    private GalleryFeedItemDTO convertToFeedItem(GooglePlace place, boolean loadPhotoInfo) {
+        AggregatedPhotoInfo photoInfo = loadPhotoInfo
+                ? getAggregatedPhotoInfo(place.getId(), null)
+                : AggregatedPhotoInfo.EMPTY;
 
-        // --- 1. Aktive Google POIs in der Nähe finden ---
-        // (Diese Logik war vorher im alten PlaceService / GoogleApiService)
-        List<GooglePlace> nearbyGooglePlaces = googlePlaceRepository.findPlacesWithinRadius(latitude, longitude, 500); // z.B. 500m Radius
-
-        List<GalleryFeedItemDTO> googleFeedItems = nearbyGooglePlaces.stream()
-                .map(this::mapToFeedItemDTO) // Mapper für GooglePlace
-                .filter(dto -> dto.photoCount() > 0) // Nur Orte mit Fotos anzeigen
-                .collect(Collectors.toList());
-
-        // --- 2. Aktive Custom Iris Spots in der Nähe finden ---
-        List<CustomPlace> nearbyCustomPlaces = customPlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
-
-        List<GalleryFeedItemDTO> customFeedItems = nearbyCustomPlaces.stream()
-                .map(this::mapToFeedItemDTO) // Mapper für CustomPlace
-                .filter(dto -> dto.photoCount() > 0) // Nur Orte mit Fotos anzeigen
-                .collect(Collectors.toList());
-
-        // --- 3. Beide Listen zusammenführen und sortieren (z.B. nach neustem Foto) ---
-        List<GalleryFeedItemDTO> combinedList = Stream.concat(googleFeedItems.stream(), customFeedItems.stream())
-                .sorted(Comparator.comparing(GalleryFeedItemDTO::newestPhotoTimestamp).reversed())
-                .collect(Collectors.toList());
-
-        return combinedList;
+        return new GalleryFeedItemDTO(
+                GalleryPlaceType.GOOGLE_POI,
+                place.getName(),
+                place.getLocation().getY(),
+                place.getLocation().getX(),
+                photoInfo.coverImageUrl(),
+                photoInfo.count(),
+                photoInfo.newestPhotoTimestamp(),
+                place.getId(),
+                null,
+                place.getAddress(),
+                place.getRadiusMeters(),
+                null,
+                false,
+                true,
+                null
+        );
     }
 
-
-    // =================================================================================
-    // Private Mapper-Methoden (Das Herzstück der DTO-Umwandlung)
-    // =================================================================================
-
     /**
-     * Private Hilfsmethode: Wandelt eine CustomPlace-Entity in ein GalleryFeedItemDTO um.
-     * Führt DB-Abfragen für Foto-Infos aus.
+     * Private Helfermethode: Konvertiert ein CustomPlace-Entity in ein DTO.
      */
-    private GalleryFeedItemDTO mapToFeedItemDTO(CustomPlace place) {
-        // TODO: Diese Abfragen sind in einer Schleife nicht performant (N+1 Problem).
-        // Später optimieren wir das mit einer einzigen Aggregat-Query.
-        // Für jetzt ist es funktional.
-        AggregatedPhotoInfo photoInfo = getAggregatedPhotoInfo(null, place.getId());
+    private GalleryFeedItemDTO convertToFeedItem(CustomPlace place, boolean loadPhotoInfo) {
+        AggregatedPhotoInfo photoInfo = loadPhotoInfo
+                ? getAggregatedPhotoInfo(null, place.getId())
+                : AggregatedPhotoInfo.EMPTY;
 
         return new GalleryFeedItemDTO(
                 GalleryPlaceType.IRIS_SPOT,
                 place.getName(),
-                place.getLocation().getY(), // Latitude
-                place.getLocation().getX(), // Longitude
+                place.getLocation().getY(),
+                place.getLocation().getX(),
                 photoInfo.coverImageUrl(),
-                photoInfo.photoCount(),
+                photoInfo.count(),
                 photoInfo.newestPhotoTimestamp(),
-                null, // googlePlaceId
-                place.getId(), // customPlaceId
-                null, // address
+                null,
+                place.getId(),
+                null,
                 place.getRadiusMeters(),
                 place.getAccessType().name(),
                 place.isTrending(),
@@ -144,77 +179,49 @@ public class GalleryFeedService {
     }
 
     /**
-     * Private Hilfsmethode: Wandelt eine GooglePlace-Entity in ein GalleryFeedItemDTO um.
+     * Holt die aggregierten Foto-Infos (Anzahl, Cover-URL) für einen Ort.
      */
-    private GalleryFeedItemDTO mapToFeedItemDTO(GooglePlace place) {
-        // TODO: Auch hier N+1 Problem, das wir später optimieren.
-        AggregatedPhotoInfo photoInfo = getAggregatedPhotoInfo(place.getId(), null);
-
-        return new GalleryFeedItemDTO(
-                GalleryPlaceType.GOOGLE_POI,
-                place.getName(),
-                place.getLocation().getY(),
-                place.getLocation().getX(),
-                photoInfo.coverImageUrl(),
-                photoInfo.photoCount(),
-                photoInfo.newestPhotoTimestamp(),
-                place.getId(), // googlePlaceId
-                null, // customPlaceId
-                place.getAddress(),
-                place.getRadiusMeters(),
-                "PUBLIC", // Google Places sind immer PUBLIC
-                false,    // Google Places sind nie 'Trending'
-                true,
-                null      // Google Places laufen nicht ab
-        );
-    }
-
-    /**
-     * Holt Foto-Anzahl, Cover-URL und neustes Datum für einen Ort.
-     * (Später optimieren wir das direkt in der Haupt-Query)
-     */
-    private record AggregatedPhotoInfo(long photoCount, String coverImageUrl, OffsetDateTime newestPhotoTimestamp) {}
-
     private AggregatedPhotoInfo getAggregatedPhotoInfo(Long googlePlaceId, UUID customPlaceId) {
-        // Findet das neuste, aktive Public-Foto für das Cover-Bild
         Optional<Photo> coverPhotoOpt;
         long count;
+        OffsetDateTime now = OffsetDateTime.now();
 
         if (googlePlaceId != null) {
-            coverPhotoOpt = photoRepository.findFirstByGooglePlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(googlePlaceId, PhotoVisibility.PUBLIC, OffsetDateTime.now());
-            count = photoRepository.countByGooglePlaceIdAndVisibilityAndExpiresAtAfter(googlePlaceId, PhotoVisibility.PUBLIC, OffsetDateTime.now());
+            coverPhotoOpt = photoRepository.findFirstByGooglePlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(
+                    googlePlaceId, PhotoVisibility.PUBLIC, now
+            );
+            count = photoRepository.countByGooglePlaceIdAndVisibilityAndExpiresAtAfter(
+                    googlePlaceId, PhotoVisibility.PUBLIC, now
+            );
         } else {
-            coverPhotoOpt = photoRepository.findFirstByCustomPlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(customPlaceId, PhotoVisibility.PUBLIC, OffsetDateTime.now());
-            count = photoRepository.countByCustomPlaceIdAndVisibilityAndExpiresAtAfter(customPlaceId, PhotoVisibility.PUBLIC, OffsetDateTime.now());
+            coverPhotoOpt = photoRepository.findFirstByCustomPlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(
+                    customPlaceId, PhotoVisibility.PUBLIC, now
+            );
+            count = photoRepository.countByCustomPlaceIdAndVisibilityAndExpiresAtAfter(
+                    customPlaceId, PhotoVisibility.PUBLIC, now
+            );
         }
 
         if (coverPhotoOpt.isEmpty()) {
-            return new AggregatedPhotoInfo(0, null, null);
+            return AggregatedPhotoInfo.EMPTY;
         }
 
         Photo coverPhoto = coverPhotoOpt.get();
+
+        // Annahme: storageUrl ist nur der Objektname, nicht die volle URL
+        String objectName = coverPhoto.getStorageUrl();
+        if (coverPhoto.getStorageUrl().contains("/")) {
+            objectName = coverPhoto.getStorageUrl().substring(coverPhoto.getStorageUrl().lastIndexOf('/') + 1);
+        }
+
+        // !! HINWEIS: DIES WIRD FEHLSCHLAGEN, BIS WIR SCHRITT 2 MACHEN !!
         String signedUrl = gcsStorageService.generateSignedUrl(
                 photosBucketName,
-                coverPhoto.getStorageUrl(), // Annahme: storageUrl ist nur der Objektname
+                objectName,
                 15,
                 TimeUnit.MINUTES
         );
 
         return new AggregatedPhotoInfo(count, signedUrl, coverPhoto.getUploadedAt());
     }
-
-    // Damit das funktioniert, müssen wir das PhotoRepository um diese Methoden erweitern:
-    /*
-    Im PhotoRepository.java hinzufügen:
-
-    // Für Cover-Bild GooglePlace
-    Optional<Photo> findFirstByGooglePlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(Long googlePlaceId, PhotoVisibility visibility, OffsetDateTime now);
-    // Für Foto-Anzahl GooglePlace
-    long countByGooglePlaceIdAndVisibilityAndExpiresAtAfter(Long googlePlaceId, PhotoVisibility visibility, OffsetDateTime now);
-
-    // Für Cover-Bild CustomPlace
-    Optional<Photo> findFirstByCustomPlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(UUID customPlaceId, PhotoVisibility visibility, OffsetDateTime now);
-    // Für Foto-Anzahl CustomPlace
-    long countByCustomPlaceIdAndVisibilityAndExpiresAtAfter(UUID customPlaceId, PhotoVisibility visibility, OffsetDateTime now);
-    */
 }
