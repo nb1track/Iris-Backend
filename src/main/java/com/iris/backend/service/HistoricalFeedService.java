@@ -77,6 +77,7 @@ public class HistoricalFeedService {
                                 projection.getRadiusMeters(),
                                 projection.getAccessType(),
                                 projection.getIsTrending(),
+                                projection.getIsLive(),
                                 projection.getExpiresAt()
                         );
                     })
