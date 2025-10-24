@@ -46,6 +46,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 gp.radius_meters,
                 NULL AS access_type,
                 FALSE AS is_trending,
+                TRUE AS is_live,
                 NULL AS expires_at
             FROM photos p
             JOIN google_places gp ON p.google_place_id = gp.id
@@ -73,6 +74,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 cp.radius_meters,
                 cp.access_type,
                 cp.is_trending,
+                cp.is_live,
                 cp.expires_at
             FROM photos p
             JOIN custom_places cp ON p.custom_place_id = cp.id
@@ -104,6 +106,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 radius_meters,
                 access_type,
                 is_trending,
+                is_live,
                 expires_at,
                 COUNT(photo_id) AS photo_count,
                 -- Finde die URL des neusten Fotos
@@ -129,6 +132,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
             radius_meters AS radiusMeters,
             access_type AS accessType,
             is_trending AS isTrending,
+            is_live AS isLive,
             expires_at AS expiresAt
         FROM grouped_places
         ORDER BY newest_photo_timestamp DESC
@@ -157,6 +161,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
         Integer getRadiusMeters();
         String getAccessType();
         boolean getIsTrending();
+        boolean getIsLive();
         OffsetDateTime getExpiresAt();
 
         // Standard-Methode, um die Projektion einfach in das echte DTO umzuwandeln
@@ -175,6 +180,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                     getRadiusMeters(),
                     getAccessType(),
                     getIsTrending(),
+                    getIsLive(),
                     getExpiresAt()
             );
         }

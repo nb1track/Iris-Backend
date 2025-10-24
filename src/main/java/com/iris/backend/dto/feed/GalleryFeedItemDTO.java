@@ -31,5 +31,6 @@ public record GalleryFeedItemDTO(
         Integer radiusMeters,
         String accessType, // z.B. "PUBLIC", "PASSWORD"
         Boolean isTrending,
+        Boolean isLive,
         OffsetDateTime expiresAt
 ) {}

@@ -138,6 +138,7 @@ public class GalleryFeedService {
                 place.getRadiusMeters(),
                 place.getAccessType().name(),
                 place.isTrending(),
+                place.isLive(),
                 place.getExpiresAt()
         );
     }
@@ -163,6 +164,7 @@ public class GalleryFeedService {
                 place.getRadiusMeters(),
                 "PUBLIC", // Google Places sind immer PUBLIC
                 false,    // Google Places sind nie 'Trending'
+                true,
                 null      // Google Places laufen nicht ab
         );
     }
