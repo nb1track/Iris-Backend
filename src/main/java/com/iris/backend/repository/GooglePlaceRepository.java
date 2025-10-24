@@ -33,7 +33,7 @@ public interface GooglePlaceRepository extends JpaRepository<GooglePlace, Long> 
             google_places p
         JOIN
             photos ph ON p.id = ph.google_place_id,
-            jsonb_to_recordset(:historyJson::jsonb) AS h(latitude float, longitude float, "timestamp" timestamptz)
+            jsonb_to_recordset(CAST(:historyJson AS jsonb)) AS h(latitude float, longitude float, "timestamp" timestamptz)
         WHERE
             ph.visibility = 'PUBLIC'
             AND ST_DWithin(p.location, ST_MakePoint(h.longitude, h.latitude)::geography, :radiusInMeters)

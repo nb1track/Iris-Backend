@@ -28,7 +28,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 (value ->> 'latitude')::float AS latitude,
                 (value ->> 'longitude')::float AS longitude,
                 (value ->> 'timestamp')::timestamptz AS timestamp
-            FROM jsonb_array_elements(:historyJson::jsonb)
+            FROM jsonb_array_elements(CAST(:historyJson AS jsonb))
         ),
         
         -- 1. Finde alle passenden Google POI Fotos
