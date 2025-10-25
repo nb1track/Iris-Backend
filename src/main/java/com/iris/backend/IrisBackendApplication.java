@@ -8,6 +8,6 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @EnableAsync
 public class IrisBackendApplication {
     public static void main(String[] args) {
-        SpringApplication.run(IrisBackendApplication.class, args); // Name hier auch anpassen
+        SpringApplication.run(IrisBackendApplication.class, args);
     }
 }
