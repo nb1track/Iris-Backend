@@ -67,7 +67,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 p.uploaded_at,
                 cp.id::text AS place_id,
                 cp.name,
-                NULL AS address,
+                NULL::text AS address,
                 ST_Y(cp.location::geometry) AS latitude,
                 ST_X(cp.location::geometry) AS longitude,
                 'IRIS_SPOT' AS place_type,
