@@ -113,7 +113,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 (ARRAY_AGG(storage_url ORDER BY uploaded_at DESC))[1] AS cover_image_url,
                 MAX(uploaded_at) AS newest_photo_timestamp
             FROM all_photos
-            GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+            GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
         )
         
         -- 5. Finale Selektion als Interface-Projektion
