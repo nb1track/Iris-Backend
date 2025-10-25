@@ -254,4 +254,17 @@ public class GalleryFeedService {
 
         return new AggregatedPhotoInfo(count, signedUrl, coverPhoto.getUploadedAt());
     }
+
+    /**
+     * NEU: Öffentliche Methode, um ein einzelnes CustomPlace-Entity
+     * in ein GalleryFeedItemDTO umzuwandeln.
+     * Nützlich nach dem Erstellen/Aktualisieren eines Spots.
+     *
+     * @param place Das entity, das konvertiert werden soll.
+     * @param loadPhotoInfo 'true', wenn Foto-Infos geladen werden sollen.
+     * @return Das konvertierte GalleryFeedItemDTO.
+     */
+    public GalleryFeedItemDTO getFeedItemForPlace(CustomPlace place, boolean loadPhotoInfo) {
+        return convertToFeedItem(place, loadPhotoInfo);
+    }
 }

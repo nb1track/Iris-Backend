@@ -31,14 +31,23 @@ public class CustomPlaceController {
 
     /**
      * Erstellt einen neuen Custom Place (Iris Spot).
+     * KORRIGIERT: Gibt jetzt ein GalleryFeedItemDTO zurück, um Serialisierungsfehler
+     * des 'Point'-Objekts zu vermeiden und konsistent mit anderen Endpunkten zu sein.
      */
     @PostMapping
-    public ResponseEntity<CustomPlace> createCustomPlace(
-            @RequestBody CreateCustomPlaceRequestDTO request,
-            @AuthenticationPrincipal User currentUser) {
+    public ResponseEntity<GalleryFeedItemDTO> createCustomPlace( // <-- RÜCKGABETYP GEÄNDERT
+                                                                 @RequestBody CreateCustomPlaceRequestDTO request,
+                                                                 @AuthenticationPrincipal User currentUser) {
 
-        CustomPlace newPlace = customPlaceService.createCustomPlace(request, currentUser);
-        return ResponseEntity.status(HttpStatus.CREATED).body(newPlace);
+        // 1. Erstelle den Spot in der Datenbank (gibt das Entity zurück)
+        CustomPlace newPlaceEntity = customPlaceService.createCustomPlace(request, currentUser);
+
+        // 2. Konvertiere das Entity in ein DTO für die Antwort
+        //    'false', da ein neuer Spot per Definition noch keine Fotos hat.
+        GalleryFeedItemDTO newPlaceDTO = galleryFeedService.getFeedItemForPlace(newPlaceEntity, false);
+
+        // 3. Gib das DTO zurück
+        return ResponseEntity.status(HttpStatus.CREATED).body(newPlaceDTO); // <-- BODY GEÄNDERT
     }
 
     /**

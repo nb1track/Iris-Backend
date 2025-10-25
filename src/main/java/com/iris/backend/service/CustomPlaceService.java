@@ -60,9 +60,14 @@ public class CustomPlaceService {
         newPlace.setLive(request.isLive());
         newPlace.setScheduledLiveAt(request.scheduledLiveAt());
         newPlace.setExpiresAt(request.expiresAt());
+        newPlace.setChallengesActivated(request.challengesActivated() != null && request.challengesActivated());
 
-        if(request.challengesActivated() != null) {
-            newPlace.setChallengesActivated(request.challengesActivated());
+        if (request.isLive() || request.scheduledLiveAt() == null) {
+            newPlace.setLive(true);
+            newPlace.setScheduledLiveAt(null); // Sicherstellen, dass es null ist, wenn isLive true ist
+        } else {
+            newPlace.setLive(false);
+            newPlace.setScheduledLiveAt(request.scheduledLiveAt());
         }
 
         return customPlaceRepository.save(newPlace);
