@@ -96,6 +96,7 @@ public class GalleryFeedService {
      * KORREKTUR: Diese Methode ruft jetzt den GoogleApiService, wenn
      * keine lokalen Google Places gefunden werden.
      */
+    @Transactional(readOnly = false)
     public List<GalleryFeedItemDTO> getTaggablePlaces(double latitude, double longitude) {
         // [1] Hole zuerst Custom Places (Iris Spots) aus der lokalen DB
         List<CustomPlace> customPlaces = customPlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
