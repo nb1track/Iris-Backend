@@ -44,10 +44,10 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 ST_X(gp.location::geometry) AS longitude,
                 'GOOGLE_POI' AS place_type,
                 gp.radius_meters,
-                NULL AS access_type,
+                NULL::text AS access_type,
                 FALSE AS is_trending,
                 TRUE AS is_live,
-                NULL AS expires_at
+                NULL::timestamptz AS expires_at
             FROM photos p
             JOIN google_places gp ON p.google_place_id = gp.id
             JOIN historical_points h ON ST_DWithin(
