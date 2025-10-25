@@ -6,7 +6,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 
 @SpringBootApplication
 @EnableAsync
-public class IrisBackendApplication { // Name geändert
+public class IrisBackendApplication {
     public static void main(String[] args) {
         SpringApplication.run(IrisBackendApplication.class, args); // Name hier auch anpassen
     }
