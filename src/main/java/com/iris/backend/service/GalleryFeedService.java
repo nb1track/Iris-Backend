@@ -10,6 +10,8 @@ import com.iris.backend.model.enums.PhotoVisibility;
 import com.iris.backend.repository.CustomPlaceRepository;
 import com.iris.backend.repository.GooglePlaceRepository;
 import com.iris.backend.repository.PhotoRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,10 +35,12 @@ import java.util.stream.Stream;
 @Transactional(readOnly = true)
 public class GalleryFeedService {
 
+    private static final Logger logger = LoggerFactory.getLogger(GalleryFeedService.class);
     private final CustomPlaceRepository customPlaceRepository;
     private final GooglePlaceRepository googlePlaceRepository;
     private final PhotoRepository photoRepository;
     private final GcsStorageService gcsStorageService;
+    private final GoogleApiService googleApiService;
 
     @Value("${gcs.bucket.name}")
     private String photosBucketName;
@@ -55,11 +59,13 @@ public class GalleryFeedService {
     public GalleryFeedService(CustomPlaceRepository customPlaceRepository,
                               GooglePlaceRepository googlePlaceRepository,
                               PhotoRepository photoRepository,
-                              GcsStorageService gcsStorageService) {
+                              GcsStorageService gcsStorageService,
+                              GoogleApiService googleApiService) {
         this.customPlaceRepository = customPlaceRepository;
         this.googlePlaceRepository = googlePlaceRepository;
         this.photoRepository = photoRepository;
         this.gcsStorageService = gcsStorageService;
+        this.googleApiService = googleApiService;
     }
 
     /**
@@ -86,16 +92,40 @@ public class GalleryFeedService {
     /**
      * Holt alle Orte (Google POIs und Iris Spots) in der Nähe eines Benutzers,
      * die zum Taggen eines Fotos verfügbar sind (deine "cameraPage").
+     *
+     * KORREKTUR: Diese Methode ruft jetzt den GoogleApiService, wenn
+     * keine lokalen Google Places gefunden werden.
      */
     public List<GalleryFeedItemDTO> getTaggablePlaces(double latitude, double longitude) {
-        List<GooglePlace> googlePlaces = googlePlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
+        // [1] Hole zuerst Custom Places (Iris Spots) aus der lokalen DB
         List<CustomPlace> customPlaces = customPlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
 
+        // [2] Versuche, Google Places aus der lokalen DB zu holen
+        List<GooglePlace> localGooglePlaces = googlePlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
+
+        List<GalleryFeedItemDTO> googlePlaceDTOs;
+
+        if (localGooglePlaces.isEmpty()) {
+            // [3a] Wenn keine lokalen Google Places gefunden, rufe die Google API auf
+            // Diese Methode (findNearbyPlaces) gibt jetzt List<GalleryFeedItemDTO> zurück
+            // und speichert die Ergebnisse bereits in der DB für zukünftige Suchen.
+            logger.info("Keine lokalen Google Places gefunden. Rufe Google API für lat={}, lon={}", latitude, longitude);
+            googlePlaceDTOs = googleApiService.findNearbyPlaces(latitude, longitude);
+        } else {
+            // [3b] Wenn lokale Google Places gefunden wurden, konvertiere sie in DTOs
+            // (ohne Foto-Infos, da 'false')
+            googlePlaceDTOs = localGooglePlaces.stream()
+                    .map(place -> convertToFeedItem(place, false))
+                    .collect(Collectors.toList());
+        }
+
+        // [4] Kombiniere die DTOs der Custom Places und der Google Places
         Stream<GalleryFeedItemDTO> combinedStream = Stream.concat(
-                googlePlaces.stream().map(place -> convertToFeedItem(place, false)), // false = KEINE Foto-Infos laden
+                googlePlaceDTOs.stream(),
                 customPlaces.stream().map(place -> convertToFeedItem(place, false))  // false = KEINE Foto-Infos laden
         );
 
+        // [5] Sortiere die kombinierte Liste nach Namen und gib sie zurück
         return combinedStream
                 .sorted(Comparator.comparing(GalleryFeedItemDTO::name))
                 .collect(Collectors.toList());

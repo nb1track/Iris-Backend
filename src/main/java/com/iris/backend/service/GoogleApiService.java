@@ -1,6 +1,7 @@
 package com.iris.backend.service;
 
-import com.iris.backend.dto.PlaceDTO;
+import com.iris.backend.dto.feed.GalleryFeedItemDTO;
+import com.iris.backend.dto.feed.GalleryPlaceType;
 import com.iris.backend.model.GooglePlace;
 import com.iris.backend.repository.GooglePlaceRepository;
 import com.google.maps.GeoApiContext;
@@ -61,17 +62,20 @@ public class GoogleApiService {
         this.googlePlaceRepository = googlePlaceRepository;
     }
 
-    public List<PlaceDTO> findNearbyPlaces(double latitude, double longitude) {
+    /**
+     * KORREKTUR: Gibt jetzt List<GalleryFeedItemDTO> zurück
+     */
+    public List<GalleryFeedItemDTO> findNearbyPlaces(double latitude, double longitude) {
         try {
             LatLng coords = new LatLng(latitude, longitude);
             PlacesSearchResponse response = PlacesApi.nearbySearchQuery(geoApiContext, coords)
-                    .radius(50)
+                    .radius(50) // Radius für die API-Suche
                     .await();
 
             return Arrays.stream(response.results)
                     .filter(googlePlace -> Collections.disjoint(Arrays.asList(googlePlace.types), UNINTERESTING_PLACE_TYPES))
-                    .map(this::saveOrUpdatePlaceFromPoi)
-                    .sorted(Comparator.comparing(PlaceDTO::importance).reversed()) // Wichtigste zuerst
+                    .map(this::saveOrUpdatePlaceFromPoi) // Gibt jetzt GalleryFeedItemDTO zurück
+                    .sorted(Comparator.comparing(GalleryFeedItemDTO::name)) // Sortiere nach Name (passend zu getTaggablePlaces)
                     .collect(Collectors.toList());
 
         } catch (Exception e) {
@@ -80,7 +84,10 @@ public class GoogleApiService {
         }
     }
 
-    private PlaceDTO saveOrUpdatePlaceFromPoi(PlacesSearchResult placeResult) {
+    /**
+     * KORREKTUR: Gibt jetzt GalleryFeedItemDTO zurück
+     */
+    private GalleryFeedItemDTO saveOrUpdatePlaceFromPoi(PlacesSearchResult placeResult) {
         GooglePlace googlePlace = googlePlaceRepository.findByGooglePlaceId(placeResult.placeId).orElseGet(GooglePlace::new);
         googlePlace.setGooglePlaceId(placeResult.placeId);
         googlePlace.setName(placeResult.name);
@@ -100,15 +107,23 @@ public class GoogleApiService {
 
         GooglePlace savedGooglePlace = googlePlaceRepository.save(googlePlace);
 
-        // KORREKTUR: Wir geben die neuen Felder im DTO zurück
-        return new PlaceDTO(
-                savedGooglePlace.getId(),
-                savedGooglePlace.getGooglePlaceId(),
+        // KORREKTUR: Wir geben jetzt ein GalleryFeedItemDTO zurück
+        return new GalleryFeedItemDTO(
+                GalleryPlaceType.GOOGLE_POI,
                 savedGooglePlace.getName(),
+                savedGooglePlace.getLocation().getY(), // latitude
+                savedGooglePlace.getLocation().getX(), // longitude
+                null, // coverImageUrl - nicht benötigt für taggable places
+                0,    // photoCount - nicht benötigt für taggable places
+                null, // newestPhotoTimestamp - nicht benötigt für taggable places
+                savedGooglePlace.getId(), // googlePlaceId (unsere interne Long ID)
+                null, // customPlaceId
                 savedGooglePlace.getAddress(),
-                null, // Fotos werden hier nicht geladen
                 savedGooglePlace.getRadiusMeters(),
-                savedGooglePlace.getImportance()
+                null, // accessType
+                false, // isTrending
+                true,  // isLive (Google POIs sind immer "live")
+                null   // expiresAt
         );
     }
 }
