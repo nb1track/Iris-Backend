@@ -103,7 +103,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 address,
                 latitude,
                 longitude,
-                radius_meters,
+                COALESCE(radius_meters, 0) AS radius_meters,
                 access_type,
                 is_trending,
                 is_live,
