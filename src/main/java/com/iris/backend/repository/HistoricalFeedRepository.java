@@ -111,7 +111,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 COUNT(photo_id) AS photo_count,
                 -- Finde die URL des neusten Fotos
                 (ARRAY_AGG(storage_url ORDER BY uploaded_at DESC))[1] AS cover_image_url,
-                MAX(uploaded_at)::timestamptz AS newest_photo_timestamp
+                MAX(uploaded_at) AS newest_photo_timestamp
             FROM all_photos
             GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
         )
@@ -133,7 +133,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
             access_type AS accessType,
             is_trending AS isTrending,
             is_live AS isLive,
-            expires_at AS expiresAt
+            expires_at::timestamptz AS expiresAt
         FROM grouped_places
         ORDER BY newest_photo_timestamp DESC
     """, nativeQuery = true)
