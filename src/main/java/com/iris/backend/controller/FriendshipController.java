@@ -17,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Coordinate;
 
 import java.util.List;
 import java.util.UUID;
@@ -27,16 +29,20 @@ public class FriendshipController {
 
     private final FriendshipService friendshipService;
     private final GooglePlaceRepository googlePlaceRepository;
-    private final CustomPlaceRepository customPlaceRepository; // NEU
+    private final CustomPlaceRepository customPlaceRepository;
+    private final GeometryFactory geometryFactory;
+
 
     public FriendshipController(
             FriendshipService friendshipService,
             GooglePlaceRepository googlePlaceRepository,
-            CustomPlaceRepository customPlaceRepository // NEU
+            CustomPlaceRepository customPlaceRepository,
+            GeometryFactory geometryFactory
     ) {
         this.friendshipService = friendshipService;
         this.googlePlaceRepository = googlePlaceRepository;
-        this.customPlaceRepository = customPlaceRepository; // NEU
+        this.customPlaceRepository = customPlaceRepository;
+        this.geometryFactory = geometryFactory;
     }
 
     /**
@@ -78,6 +84,30 @@ public class FriendshipController {
         return ResponseEntity.ok(nearbyFriends);
     }
 
+    /**
+     * NEU: Holt Freunde in einem allgemeinen Radius um den Benutzer.
+     * Perfekt für die "CameraPage", um Freunde für das Tagging anzuzeigen.
+     *
+     * @param currentUser Der authentifizierte Benutzer.
+     * @param latitude    Aktuelle Latitude des Benutzers.
+     * @param longitude   Aktuelle Longitude des Benutzers.
+     * @return A list of UserDTOs representing nearby friends.
+     */
+    @GetMapping("/nearby")
+    public ResponseEntity<List<UserDTO>> getNearbyFriends(
+            @AuthenticationPrincipal User currentUser,
+            @RequestParam double latitude,
+            @RequestParam double longitude) {
+
+        // 1. Wandle die Koordinaten in ein PostGIS 'Point'-Objekt um
+        Point userLocation = geometryFactory.createPoint(new Coordinate(longitude, latitude));
+
+        // 2. Rufe die existierende, perfekte Service-Logik auf
+        // Diese Methode filtert bereits nach Freunden und prüft, ob deren Standort aktuell ist.
+        List<UserDTO> nearbyFriends = friendshipService.findNearbyFriendsAtPlace(currentUser, userLocation);
+
+        return ResponseEntity.ok(nearbyFriends);
+    }
 
     @PostMapping("/request")
     public ResponseEntity<String> sendFriendRequest(
@@ -145,7 +175,11 @@ public class FriendshipController {
     }
 
     /**
-     * NEU: Endpunkt für User A, um den "Aktiv-System"-Refresh zu starten.
+     * Refreshes the locations of the current user's friends by sending a request to update their location data.
+     *
+     * @param currentUser the currently authenticated user whose friends' locations are to be refreshed
+     * @return a ResponseEntity representing the HTTP response; returns HTTP 200 OK on success or HTTP 400 Bad Request
+     *         if the operation could not be completed (e.g., if the user lacks a valid FCM token)
      */
     @PostMapping("/refresh-locations")
     public ResponseEntity<Void> refreshFriendLocations(@AuthenticationPrincipal User currentUser) {
@@ -158,11 +192,16 @@ public class FriendshipController {
     }
 
     /**
-     * NEU: Endpunkt für Freunde (B, C, D), um ihre "Aktiv-System"-Antwort zu senden.
+     * Handles the reporting of the current location by a user.
+     * This method allows a user (friend) to report their location to a requester.
+     *
+     * @param friend The authenticated user who is reporting their location.
+     * @param report The location details being reported, encapsulated in a LocationReportDTO object.
+     * @return A ResponseEntity with no content (HTTP 200 OK status) if the operation is successful.
      */
     @PostMapping("/report-location")
     public ResponseEntity<Void> reportLocation(
-            @AuthenticationPrincipal User friend, // (Der User, der antwortet, z.B. User B)
+            @AuthenticationPrincipal User friend,
             @RequestBody @Valid LocationReportDTO report) {
 
         friendshipService.reportLocationToRequester(friend, report);
