@@ -3,6 +3,7 @@ package com.iris.backend.service;
 import com.iris.backend.dto.FriendshipActionDTO;
 import com.iris.backend.dto.PendingRequestDTO;
 import com.iris.backend.dto.UserDTO;
+import com.iris.backend.dto.LocationReportDTO;
 import com.iris.backend.model.Friendship;
 import com.iris.backend.model.User;
 import com.iris.backend.model.enums.FriendshipStatus;
@@ -29,10 +30,12 @@ public class FriendshipService {
 
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
-    private final GcsStorageService gcsStorageService; // NEUE ABHÄNGIGKEIT
+    private final GcsStorageService gcsStorageService;
+    private final FcmService fcmService;
 
     @Value("${gcs.bucket.profile-images.name}") // NEU: Bucket-Name laden
     private String profileImagesBucketName;
+    private static final Logger logger = LoggerFactory.getLogger(FriendshipService.class);
 
     private static final double MAX_DISTANCE_METERS = 50.0;
 
@@ -41,10 +44,12 @@ public class FriendshipService {
      */
     public FriendshipService(UserRepository userRepository,
                              FriendshipRepository friendshipRepository,
-                             GcsStorageService gcsStorageService) { // NEU
+                             GcsStorageService gcsStorageService,
+                             FcmService fcmService) {
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
-        this.gcsStorageService = gcsStorageService; // NEU
+        this.gcsStorageService = gcsStorageService;
+        this.fcmService = fcmService;
     }
 
     /**
@@ -155,6 +160,57 @@ public class FriendshipService {
         newFriendship.setActionUser(requester);
 
         friendshipRepository.save(newFriendship);
+    }
+
+    /**
+     * NEU: Startet die "Aktiv-System"-Anfrage.
+     * Sendet Push-Nachrichten an alle Freunde des aktuellen Benutzers.
+     */
+    @Transactional(readOnly = true)
+    public void requestFriendLocationRefresh(User currentUser) {
+        String requesterFcmToken = currentUser.getFcmToken();
+        if (requesterFcmToken == null || requesterFcmToken.isBlank()) {
+            throw new IllegalStateException("Benutzer hat kein FCM-Token, um Antworten zu empfangen.");
+        }
+
+        // 1. Finde alle Freunde
+        List<User> friends = getFriendsAsEntities(currentUser.getId());
+
+        // 2. Sammle deren FCM-Tokens
+        List<String> friendTokens = friends.stream()
+                .map(User::getFcmToken)
+                .filter(token -> token != null && !token.isBlank())
+                .collect(Collectors.toList());
+
+        if (friendTokens.isEmpty()) {
+            logger.info("Keine Freunde mit FCM-Tokens gefunden für User {}.", currentUser.getUsername());
+            return;
+        }
+
+        // 3. Starte den FCM-Service, um die Anfragen zu senden
+        fcmService.sendLocationRefreshRequest(friendTokens, requesterFcmToken);
+    }
+
+    /**
+     * NEU: Verarbeitet die "Aktiv-System"-Antwort.
+     * Wird von einem Freund (B) aufgerufen, um seinen Standort an den Anfrager (A) zu senden.
+     */
+    public void reportLocationToRequester(User friend, LocationReportDTO report) {
+        // Der 'friend' (User B) wird aus dem @AuthenticationPrincipal geholt.
+        // Das 'report' (enthält User A's Token) kommt aus dem Request Body.
+
+        // 1. (Optional) Aktualisiere den Standort von User B in der DB (gute Synergie)
+        // Wir können dies hier tun, anstatt auf den 5-Minuten-Poll zu warten.
+        // HINWEIS: Dies erfordert, dass die Methode @Transactional ist.
+        // (Für die erste Implementierung lassen wir es einfach und fokussieren uns auf FCM)
+
+        // 2. Sende die Antwort-Push an User A
+        fcmService.sendLocationRefreshResponse(
+                report.targetFcmToken(),
+                friend,
+                report.latitude(),
+                report.longitude()
+        );
     }
 
     /**

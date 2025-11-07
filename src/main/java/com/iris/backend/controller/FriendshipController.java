@@ -4,12 +4,14 @@ import com.iris.backend.dto.FriendRequestDTO;
 import com.iris.backend.dto.FriendshipActionDTO;
 import com.iris.backend.dto.PendingRequestDTO;
 import com.iris.backend.dto.UserDTO;
+import com.iris.backend.dto.LocationReportDTO;
 import com.iris.backend.model.CustomPlace;
 import com.iris.backend.model.GooglePlace;
 import com.iris.backend.model.User;
 import com.iris.backend.repository.CustomPlaceRepository;
 import com.iris.backend.repository.GooglePlaceRepository;
 import com.iris.backend.service.FriendshipService;
+import jakarta.validation.Valid;
 import org.locationtech.jts.geom.Point;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -140,5 +142,30 @@ public class FriendshipController {
             @PathVariable UUID friendId) {
         friendshipService.removeFriend(currentUser, friendId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * NEU: Endpunkt für User A, um den "Aktiv-System"-Refresh zu starten.
+     */
+    @PostMapping("/refresh-locations")
+    public ResponseEntity<Void> refreshFriendLocations(@AuthenticationPrincipal User currentUser) {
+        try {
+            friendshipService.requestFriendLocationRefresh(currentUser);
+            return ResponseEntity.ok().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(null); // z.B. wenn User A kein FCM-Token hat
+        }
+    }
+
+    /**
+     * NEU: Endpunkt für Freunde (B, C, D), um ihre "Aktiv-System"-Antwort zu senden.
+     */
+    @PostMapping("/report-location")
+    public ResponseEntity<Void> reportLocation(
+            @AuthenticationPrincipal User friend, // (Der User, der antwortet, z.B. User B)
+            @RequestBody @Valid LocationReportDTO report) {
+
+        friendshipService.reportLocationToRequester(friend, report);
+        return ResponseEntity.ok().build();
     }
 }

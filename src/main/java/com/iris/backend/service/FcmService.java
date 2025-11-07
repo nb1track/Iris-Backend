@@ -2,6 +2,7 @@ package com.iris.backend.service;
 
 import com.iris.backend.model.Photo;
 import com.google.firebase.messaging.*;
+import com.iris.backend.model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -40,6 +41,62 @@ public class FcmService {
             }
         } catch (FirebaseMessagingException e) {
             logger.error("Error sending FCM message", e);
+        }
+    }
+
+    /**
+     * NEU: Sendet eine "Bitte-sende-mir-deinen-Standort"-Anfrage an eine Liste von Freunden.
+     * @param friendTokens Die FCM-Tokens der Freunde (B, C, D...)
+     * @param requesterFcmToken Das FCM-Token des Anfragers (User A)
+     */
+    @Async
+    public void sendLocationRefreshRequest(List<String> friendTokens, String requesterFcmToken) {
+        if (friendTokens.isEmpty() || requesterFcmToken == null || requesterFcmToken.isBlank()) {
+            logger.warn("sendLocationRefreshRequest abgebrochen: Keine Tokens oder kein Anfrager-Token.");
+            return;
+        }
+
+        MulticastMessage message = MulticastMessage.builder()
+                .putAllData(Map.of(
+                        "type", "REQUEST_LOCATION",
+                        "requesterFcmToken", requesterFcmToken // (Wichtig, damit die Antwort zugestellt werden kann)
+                ))
+                .addAllTokens(friendTokens)
+                .build();
+
+        try {
+            BatchResponse response = FirebaseMessaging.getInstance().sendMulticast(message);
+            logger.info("Standortanfrage an {} Geräte gesendet.", response.getSuccessCount());
+        } catch (FirebaseMessagingException e) {
+            logger.error("Fehler beim Senden der Standortanfrage", e);
+        }
+    }
+
+    /**
+     * NEU: Sendet die Standort-Antwort eines Freundes (B) zurück an den Anfrager (A).
+     * @param targetToken Das Token des Anfragers (User A)
+     * @param friend Der User, der seinen Standort meldet (User B)
+     * @param latitude Latiude von User B
+     * @param longitude Longitude von User B
+     */
+    @Async
+    public void sendLocationRefreshResponse(String targetToken, User friend, double latitude, double longitude) {
+        Message message = Message.builder()
+                .putAllData(Map.of(
+                        "type", "FRIEND_LOCATION_UPDATE",
+                        "friendId", friend.getId().toString(),
+                        "friendUsername", friend.getUsername(),
+                        "latitude", String.valueOf(latitude),
+                        "longitude", String.valueOf(longitude)
+                ))
+                .setToken(targetToken)
+                .build();
+
+        try {
+            String response = FirebaseMessaging.getInstance().send(message);
+            logger.info("Standort-Antwort von {} an {} gesendet: {}", friend.getUsername(), targetToken, response);
+        } catch (FirebaseMessagingException e) {
+            logger.error("Fehler beim Senden der Standort-Antwort", e);
         }
     }
 }
