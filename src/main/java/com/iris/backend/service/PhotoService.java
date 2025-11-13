@@ -18,8 +18,6 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -36,7 +34,6 @@ public class PhotoService {
     private final GooglePlaceRepository googlePlaceRepository;
     private final GcsStorageService gcsStorageService;
     private final UserRepository userRepository;
-    private final TimelineEntryRepository timelineEntryRepository;
     private final FriendshipService friendshipService;
     private final CustomPlaceRepository customPlaceRepository;
     private final PhotoLikeRepository photoLikeRepository;
@@ -53,7 +50,6 @@ public class PhotoService {
             GooglePlaceRepository googlePlaceRepository,
             GcsStorageService gcsStorageService,
             UserRepository userRepository,
-            TimelineEntryRepository timelineEntryRepository,
             //Services
             @Lazy FriendshipService friendshipService,
             CustomPlaceRepository customPlaceRepository,
@@ -69,7 +65,6 @@ public class PhotoService {
         this.googlePlaceRepository = googlePlaceRepository;
         this.gcsStorageService = gcsStorageService;
         this.userRepository = userRepository;
-        this.timelineEntryRepository = timelineEntryRepository;
         this.friendshipService = friendshipService;
         this.customPlaceRepository = customPlaceRepository;
         this.photoLikeRepository = photoLikeRepository;
@@ -113,15 +108,6 @@ public class PhotoService {
 
             Photo savedPhoto = photoRepository.save(newPhoto);
 
-            if (visibility == PhotoVisibility.FRIENDS && friendIds != null && !friendIds.isEmpty()) {
-                List<User> targetFriends = userRepository.findAllById(friendIds);
-                for (User friend : targetFriends) {
-                    TimelineEntry newEntry = new TimelineEntry();
-                    newEntry.setUser(friend);
-                    newEntry.setPhoto(savedPhoto);
-                    timelineEntryRepository.save(newEntry);
-                }
-            }
 
             if (savedPhoto.getVisibility() == PhotoVisibility.FRIENDS) {
                 List<User> friends = friendshipService.getFriendsAsEntities(uploader.getId());
