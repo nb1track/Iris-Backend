@@ -6,6 +6,7 @@ import com.iris.backend.dto.HistoricalPointDTO;
 import com.iris.backend.dto.PhotoResponseDTO;
 import com.iris.backend.dto.feed.GalleryPlaceType;
 import com.iris.backend.model.*;
+import com.iris.backend.model.enums.FriendshipStatus;
 import com.iris.backend.model.enums.PhotoVisibility;
 import com.iris.backend.repository.*;
 import org.locationtech.jts.geom.Coordinate;
@@ -22,6 +23,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -40,6 +43,7 @@ public class PhotoService {
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
     private final String photosBucketName;
     private final String profileImagesBucketName;
+    private final FriendshipRepository friendshipRepository;
     private final FcmService fcmService;
     private final ObjectMapper objectMapper;
 
@@ -56,6 +60,7 @@ public class PhotoService {
             PhotoLikeRepository photoLikeRepository,
             FcmService fcmService,
             ObjectMapper objectMapper,
+            FriendshipRepository friendshipRepository,
             //Werte aus application.properties
             @Value("${gcs.bucket.photos.name}") String photosBucketName,
             @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName
@@ -70,6 +75,7 @@ public class PhotoService {
         this.photoLikeRepository = photoLikeRepository;
         this.fcmService = fcmService;
         this.objectMapper = objectMapper;
+        this.friendshipRepository = friendshipRepository;
         this.photosBucketName = photosBucketName;
         this.profileImagesBucketName = profileImagesBucketName;
     }
@@ -148,7 +154,67 @@ public class PhotoService {
     }
 
     // Die restlichen Methoden bleiben wie von dir bereitgestellt
+    /**
+     * Holt eine Liste von Foto-DTOs, basierend auf einer Liste von IDs.
+     * Prüft für jede ID die Berechtigung.
+     */
+    @Transactional(readOnly = true)
+    public List<PhotoResponseDTO> getPhotoDTOsByIds(List<UUID> photoIds, User currentUser) {
+        if (photoIds == null || photoIds.isEmpty()) {
+            return List.of();
+        }
 
+        // Rufe die 'getPhotoDTOById'-Methode für jede ID in der Liste auf.
+        // Stream verarbeitet das parallel und effizient.
+        return photoIds.stream()
+                .map(photoId -> {
+                    try {
+                        // Rufe die Helfermethode auf, die die Sicherheitsprüfung enthält
+                        return getPhotoDTOById(photoId, currentUser);
+                    } catch (Exception e) {
+                        // Wenn Foto nicht gefunden oder keine Berechtigung,
+                        // gib null zurück.
+                        // (Man könnte hier loggen: logger.warn("Konnte Foto {} für User {} nicht laden: {}", photoId, currentUser.getId(), e.getMessage());)
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull) // Filtere alle 'null'-Ergebnisse (ungültige/verbotene IDs) heraus
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Holt ein einzelnes Foto als DTO, wenn der Benutzer die Berechtigung hat.
+     * (Wir ändern die Sichtbarkeit auf 'private', da sie nur noch intern genutzt wird)
+     * KORREKTUR: TimelineService braucht sie auch. Wir lassen sie 'public'.
+     */
+    public PhotoResponseDTO getPhotoDTOById(UUID photoId, User currentUser) {
+        Photo photo = photoRepository.findById(photoId)
+                .orElseThrow(() -> new RuntimeException("Photo not found"));
+
+        User uploader = photo.getUploader();
+
+        // 1. Fall: Der Anfragende ist der Uploader selbst
+        if (uploader.getId().equals(currentUser.getId())) {
+            return toPhotoResponseDTO(photo);
+        }
+
+        // 2. Fall: Das Foto ist PUBLIC
+        if (photo.getVisibility() == PhotoVisibility.PUBLIC) {
+            return toPhotoResponseDTO(photo);
+        }
+
+        // 3. Fall: Das Foto ist FRIENDS-Only
+        if (photo.getVisibility() == PhotoVisibility.FRIENDS) {
+            Optional<Friendship> friendship = friendshipRepository.findFriendshipBetweenUsers(currentUser, uploader);
+
+            if (friendship.isPresent() && friendship.get().getStatus() == FriendshipStatus.ACCEPTED) {
+                return toPhotoResponseDTO(photo);
+            }
+        }
+
+        // 4. Fall: Keine Berechtigung
+        throw new SecurityException("User is not authorized to view this photo.");
+    }
     @Transactional
     public void likePhoto(UUID photoId, User user) {
         photoRepository.findById(photoId).orElseThrow(() -> new RuntimeException("Photo not found with ID: " + photoId));
@@ -269,13 +335,9 @@ public class PhotoService {
                 photo.getId(),
                 signedPhotoUrl,
                 photo.getUploadedAt(),
-
-                // --- NEUE FELDER ---
                 placeType,
                 googlePlaceId,
                 customPlaceId,
-                // --- ENDE NEUE FELDER ---
-
                 placeName,
                 uploader.getId(),
                 uploader.getUsername(),

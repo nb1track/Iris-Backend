@@ -83,18 +83,18 @@ public class PhotoController {
     }
 
     /**
-     * Retrieves the feed of photos shared by friends of the authenticated user.
-     *
-     * @param user the authenticated user whose friends' feed is to be retrieved,
-     *             injected automatically by Spring Security
-     * @return a {@link ResponseEntity} containing a list of {@link PhotoResponseDTO} objects
-     *         representing the photos in the user's friends' feed
+     * Ruft eine Liste von Fotos anhand ihrer IDs ab.
+     * Stellt sicher, dass der anfragende Benutzer berechtigt ist, jedes Foto zu sehen.
+     * Fotos, für die keine Berechtigung besteht oder die nicht gefunden wurden,
+     * werden einfach aus der finalen Liste weggelassen.
      */
-    @GetMapping("/feed")
-    public ResponseEntity<List<PhotoResponseDTO>> getFriendsFeed(@AuthenticationPrincipal User user) {
-        // Spring Security injiziert hier automatisch den angemeldeten User
-        List<PhotoResponseDTO> feedPhotos = photoService.getFriendsFeed(user.getId());
-        return ResponseEntity.ok(feedPhotos);
+    @PostMapping("/batch")
+    public ResponseEntity<List<PhotoResponseDTO>> getPhotosByIds(
+            @RequestBody List<UUID> photoIds,
+            @AuthenticationPrincipal User currentUser) {
+
+        List<PhotoResponseDTO> photos = photoService.getPhotoDTOsByIds(photoIds, currentUser);
+        return ResponseEntity.ok(photos);
     }
 
     /**
