@@ -1,10 +1,6 @@
 package com.iris.backend.controller;
 
-import com.iris.backend.dto.FriendRequestDTO;
-import com.iris.backend.dto.FriendshipActionDTO;
-import com.iris.backend.dto.PendingRequestDTO;
-import com.iris.backend.dto.UserDTO;
-import com.iris.backend.dto.LocationReportDTO;
+import com.iris.backend.dto.*;
 import com.iris.backend.model.CustomPlace;
 import com.iris.backend.model.GooglePlace;
 import com.iris.backend.model.User;
@@ -43,6 +39,19 @@ public class FriendshipController {
         this.googlePlaceRepository = googlePlaceRepository;
         this.customPlaceRepository = customPlaceRepository;
         this.geometryFactory = geometryFactory;
+    }
+
+    /**
+     * Holt eine Liste von Spots, an denen sich Freunde des aktuellen Benutzers aufhalten.
+     * @param currentUser Der eingeloggte Benutzer.
+     * @return Eine Liste von FriendAtSpotDTOs.
+     */
+    @GetMapping("/at-spots")
+    public ResponseEntity<List<FriendAtSpotDTO>> getFriendsAtSpots(
+            @AuthenticationPrincipal User currentUser) {
+
+        List<FriendAtSpotDTO> spots = friendshipService.getFriendsAtSpots(currentUser);
+        return ResponseEntity.ok(spots);
     }
 
     /**

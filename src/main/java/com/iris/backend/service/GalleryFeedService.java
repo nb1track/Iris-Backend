@@ -48,7 +48,7 @@ public class GalleryFeedService {
     /**
      * Interner Record zur Bündelung von Foto-Aggregationsergebnissen.
      */
-    private record AggregatedPhotoInfo(long count, String coverImageUrl, OffsetDateTime newestPhotoTimestamp) {
+    public record AggregatedPhotoInfo(long count, String coverImageUrl, OffsetDateTime newestPhotoTimestamp) {
         /**
          * Statische Konstante für den schnellen "Taggable Places"-Feed,
          * der keine Foto-Infos benötigt.
@@ -266,6 +266,19 @@ public class GalleryFeedService {
      * @return Das konvertierte GalleryFeedItemDTO.
      */
     public GalleryFeedItemDTO getFeedItemForPlace(CustomPlace place, boolean loadPhotoInfo) {
+        return convertToFeedItem(place, loadPhotoInfo);
+    }
+
+    /**
+     * NEU: Öffentliche Methode, um ein einzelnes GooglePlace-Entity
+     * in ein GalleryFeedItemDTO umzuwandeln.
+     *
+     * @param place Das entity, das konvertiert werden soll.
+     * @param loadPhotoInfo 'true', wenn Foto-Infos geladen werden sollen.
+     * @return Das konvertierte GalleryFeedItemDTO.
+     */
+    public GalleryFeedItemDTO getFeedItemForPlace(GooglePlace place, boolean loadPhotoInfo) {
+        // Ruft die private Helfermethode auf
         return convertToFeedItem(place, loadPhotoInfo);
     }
 }

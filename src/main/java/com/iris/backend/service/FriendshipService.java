@@ -1,25 +1,33 @@
 package com.iris.backend.service;
 
+import com.iris.backend.dto.FriendAtSpotDTO;
 import com.iris.backend.dto.FriendshipActionDTO;
 import com.iris.backend.dto.PendingRequestDTO;
 import com.iris.backend.dto.UserDTO;
+import com.iris.backend.dto.feed.GalleryFeedItemDTO;
+import com.iris.backend.model.CustomPlace;
 import com.iris.backend.dto.LocationReportDTO;
 import com.iris.backend.model.Friendship;
+import com.iris.backend.model.GooglePlace;
 import com.iris.backend.model.User;
 import com.iris.backend.model.enums.FriendshipStatus;
+import com.iris.backend.repository.CustomPlaceRepository;
 import com.iris.backend.repository.FriendshipRepository;
+import com.iris.backend.repository.GooglePlaceRepository;
 import com.iris.backend.repository.UserRepository;
+import com.iris.backend.service.GalleryFeedService;
 import org.locationtech.jts.geom.Point;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -32,8 +40,11 @@ public class FriendshipService {
     private final FriendshipRepository friendshipRepository;
     private final GcsStorageService gcsStorageService;
     private final FcmService fcmService;
+    private final GooglePlaceRepository googlePlaceRepository;
+    private final CustomPlaceRepository customPlaceRepository;
+    private final GalleryFeedService galleryFeedService;
 
-    @Value("${gcs.bucket.profile-images.name}") // NEU: Bucket-Name laden
+    @Value("${gcs.bucket.profile-images.name}")
     private String profileImagesBucketName;
     private static final Logger logger = LoggerFactory.getLogger(FriendshipService.class);
 
@@ -45,11 +56,96 @@ public class FriendshipService {
     public FriendshipService(UserRepository userRepository,
                              FriendshipRepository friendshipRepository,
                              GcsStorageService gcsStorageService,
-                             FcmService fcmService) {
+                             FcmService fcmService,
+                             GooglePlaceRepository googlePlaceRepository,
+                             CustomPlaceRepository customPlaceRepository,
+                             GalleryFeedService galleryFeedService) {
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
         this.gcsStorageService = gcsStorageService;
         this.fcmService = fcmService;
+        this.googlePlaceRepository = googlePlaceRepository;
+        this.customPlaceRepository = customPlaceRepository;
+        this.galleryFeedService = galleryFeedService;
+    }
+
+    /**
+     * Findet alle Spots (Google & Iris), an denen sich Freunde des aktuellen Benutzers
+     * gerade aufhalten (Standort-Update innerhalb der letzten 5 Minuten).
+     *
+     * @param currentUser Der eingeloggte Benutzer.
+     * @return Eine Liste von Spots, angereichert mit den Freunden, die dort sind.
+     */
+    @Transactional(readOnly = true)
+    public List<FriendAtSpotDTO> getFriendsAtSpots(User currentUser) {
+        OffsetDateTime fiveMinutesAgo = OffsetDateTime.now().minusMinutes(5);
+
+        // 1. Finde alle Freunde mit einem aktuellen Standort-Update
+        List<User> activeFriends = getFriendsAsEntities(currentUser.getId()).stream()
+                .filter(friend -> friend.getLastLocation() != null &&
+                        friend.getLastLocationUpdatedAt() != null &&
+                        friend.getLastLocationUpdatedAt().isAfter(fiveMinutesAgo))
+                .toList();
+
+        if (activeFriends.isEmpty()) {
+            return List.of(); // Keine aktiven Freunde, keine Spots
+        }
+
+        // 2. Erstelle eine Map, um Freunde pro Spot zu sammeln
+        // Wir brauchen einen eindeutigen Key für Google (Long) und Custom (UUID)
+        // Wir nutzen "g-123" für GooglePlace 123 und "c-abc..." für CustomPlace abc...
+        Map<String, List<User>> friendsPerSpotKey = new java.util.HashMap<>();
+        Map<String, Object> spotEntityMap = new java.util.HashMap<>();
+
+        // 3. Iteriere durch jeden aktiven Freund und finde seine Spots
+        for (User friend : activeFriends) {
+            double lat = friend.getLastLocation().getY();
+            double lon = friend.getLastLocation().getX();
+
+            // Finde Google Places für den Freund
+            List<GooglePlace> googlePlaces = googlePlaceRepository.findActivePlacesForUserLocation(lat, lon);
+            for (GooglePlace spot : googlePlaces) {
+                String key = "g-" + spot.getId();
+                spotEntityMap.putIfAbsent(key, spot);
+                friendsPerSpotKey.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(friend);
+            }
+
+            // Finde Custom Places für den Freund
+            List<CustomPlace> customPlaces = customPlaceRepository.findActivePlacesForUserLocation(lat, lon);
+            for (CustomPlace spot : customPlaces) {
+                String key = "c-" + spot.getId();
+                spotEntityMap.putIfAbsent(key, spot);
+                friendsPerSpotKey.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(friend);
+            }
+        }
+
+        // 4. Konvertiere die gesammelten Daten in die finalen DTOs
+        return friendsPerSpotKey.entrySet().stream()
+                .map(entry -> {
+                    String spotKey = entry.getKey();
+                    Object spotEntity = spotEntityMap.get(spotKey);
+
+                    // Konvertiere das Entity (Google/Custom) in ein GalleryFeedItemDTO
+                    GalleryFeedItemDTO spotInfo;
+                    if (spotEntity instanceof GooglePlace gp) {
+                        // 'true' = Lade Foto-Infos (Coverbild etc.)
+                        spotInfo = galleryFeedService.getFeedItemForPlace(gp, true);
+                    } else if (spotEntity instanceof CustomPlace cp) {
+                        spotInfo = galleryFeedService.getFeedItemForPlace(cp, true);
+                    } else {
+                        return null; // Sollte nicht passieren
+                    }
+
+                    // Konvertiere die Liste der User-Entities in UserDTOs (mit Profilbild-URL)
+                    List<UserDTO> friendDTOs = entry.getValue().stream()
+                            .map(this::toUserDTOWithSignedUrl) // Diese Helfermethode haben wir schon
+                            .toList();
+
+                    return new FriendAtSpotDTO(spotInfo, friendDTOs);
+                })
+                .filter(dto -> dto != null && !dto.friendsAtSpot().isEmpty())
+                .sorted(Comparator.comparing(dto -> dto.spotInfo().name())) // Sortiere nach Spot-Name
+                .toList();
     }
 
     /**
