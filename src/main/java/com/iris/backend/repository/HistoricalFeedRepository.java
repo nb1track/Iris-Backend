@@ -125,7 +125,8 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
             longitude,
             cover_image_url AS coverImageUrl,
             photo_count AS photoCount,
-            newest_photo_timestamp AS newestPhotoTimestamp,
+            -- HIER IST DIE KORREKTUR: Expliziter Cast zu timestamptz
+            newest_photo_timestamp::timestamptz AS newestPhotoTimestamp,
             CASE WHEN place_type = 'GOOGLE_POI' THEN place_id::bigint ELSE NULL END AS googlePlaceId,
             CASE WHEN place_type = 'IRIS_SPOT' THEN place_id::uuid ELSE NULL END AS customPlaceId,
             address,
