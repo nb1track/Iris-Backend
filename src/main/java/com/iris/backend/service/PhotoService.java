@@ -43,6 +43,8 @@ public class PhotoService {
     private final FriendshipRepository friendshipRepository;
     private final FcmService fcmService;
     private final ObjectMapper objectMapper;
+    private final ChallengeCompletionRepository challengeCompletionRepository;
+    private final CustomPlaceChallengeRepository challengeRepository;
 
     public PhotoService(
             //Repositories
@@ -57,6 +59,8 @@ public class PhotoService {
             FcmService fcmService,
             ObjectMapper objectMapper,
             FriendshipRepository friendshipRepository,
+            ChallengeCompletionRepository challengeCompletionRepository,
+            CustomPlaceChallengeRepository challengeRepository,
             //Werte aus application.properties
             @Value("${gcs.bucket.photos.name}") String photosBucketName,
             @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName
@@ -70,19 +74,22 @@ public class PhotoService {
         this.photoLikeRepository = photoLikeRepository;
         this.fcmService = fcmService;
         this.objectMapper = objectMapper;
+        this.challengeCompletionRepository = challengeCompletionRepository;
+        this.challengeRepository = challengeRepository;
         this.friendshipRepository = friendshipRepository;
         this.photosBucketName = photosBucketName;
         this.profileImagesBucketName = profileImagesBucketName;
     }
 
     @Transactional
-    public UUID createPhoto(MultipartFile file, double latitude, double longitude, PhotoVisibility visibility, Long googlePlaceId, UUID customPlaceId, User uploader, List<UUID> friendIds) {
+    public UUID createPhoto(MultipartFile file, double latitude, double longitude,
+                            PhotoVisibility visibility, Long googlePlaceId, UUID customPlaceId,
+                            User uploader, List<UUID> friendIds, UUID challengeId) {
         if (googlePlaceId != null && customPlaceId != null) {
             throw new IllegalArgumentException("A photo can only be linked to a Google Place or a Custom Place, not both.");
         }
 
         try {
-            // KORREKTUR: Ruft die richtige Methode in deinem GcsStorageService auf
             String objectName = gcsStorageService.uploadPhoto(file);
             Point location = geometryFactory.createPoint(new Coordinate(longitude, latitude));
 
@@ -108,6 +115,19 @@ public class PhotoService {
 
             Photo savedPhoto = photoRepository.save(newPhoto);
 
+            if (challengeId != null) {
+                // Finde die Challenge-Instanz
+                CustomPlaceChallenge challenge = challengeRepository.findById(challengeId)
+                        .orElseThrow(() -> new RuntimeException("Challenge not found with ID: " + challengeId));
+
+                // Erstelle den "Abschluss"-Eintrag
+                ChallengeCompletion completion = new ChallengeCompletion();
+                completion.setChallenge(challenge);
+                completion.setUser(uploader);
+                completion.setPhoto(savedPhoto); // Verknüpfe das gerade gespeicherte Foto
+
+                challengeCompletionRepository.save(completion);
+            }
 
             if (savedPhoto.getVisibility() == PhotoVisibility.FRIENDS) {
                 List<User> friends = friendshipService.getFriendsAsEntities(uploader.getId());

@@ -1,12 +1,13 @@
 package com.iris.backend.controller;
 
-import com.iris.backend.dto.CreateCustomPlaceRequestDTO;
-import com.iris.backend.dto.UserDTO;
+import com.iris.backend.dto.*;
 import com.iris.backend.dto.feed.GalleryFeedItemDTO; // NEUES DTO
 import com.iris.backend.model.CustomPlace;
 import com.iris.backend.model.User;
+import com.iris.backend.service.ChallengeService;
 import com.iris.backend.service.CustomPlaceService;
 import com.iris.backend.service.GalleryFeedService; // NEUER SERVICE
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,13 +21,16 @@ import java.util.UUID;
 public class CustomPlaceController {
 
     private final CustomPlaceService customPlaceService;
-    private final GalleryFeedService galleryFeedService; // NEU
+    private final GalleryFeedService galleryFeedService;
+    private final ChallengeService challengeService;
 
     // Konstruktor bereinigt: PlaceService ist entfernt
     public CustomPlaceController(CustomPlaceService customPlaceService,
-                                 GalleryFeedService galleryFeedService) {
+                                 GalleryFeedService galleryFeedService,
+                                 ChallengeService challengeService) {
         this.customPlaceService = customPlaceService;
         this.galleryFeedService = galleryFeedService;
+        this.challengeService = challengeService;
     }
 
     /**
@@ -89,4 +93,48 @@ public class CustomPlaceController {
         List<GalleryFeedItemDTO> mySpots = galleryFeedService.getMyCreatedSpots(currentUser);
         return ResponseEntity.ok(mySpots);
     }
+
+    /**
+     * NEU: Holt alle Challenges für einen bestimmten Custom Place.
+     * Entspricht GET /place/challenges?place_id=... aus challenges.md
+     */
+    @GetMapping("/{placeId}/challenges")
+    public ResponseEntity<List<ChallengeDTO>> getChallengesForPlace(
+            @PathVariable UUID placeId,
+            @AuthenticationPrincipal User currentUser) {
+
+        // Die user_id aus der Query (challenges.md) ist nicht nötig,
+        // da wir den User sicher aus dem Token bekommen.
+        List<ChallengeDTO> challenges = challengeService.getChallengesForPlace(placeId, currentUser);
+        return ResponseEntity.ok(challenges);
+    }
+
+    /**
+     * NEU: Lässt einen User einer Challenge beitreten.
+     * Entspricht POST /place/challenges aus challenges.md
+     */
+    @PostMapping("/challenges/join")
+    public ResponseEntity<Void> joinChallenge(
+            @RequestBody @Valid JoinChallengeRequestDTO request,
+            @AuthenticationPrincipal User currentUser) {
+
+        // Die user_id im Body (challenges.md) ist nicht nötig,
+        // da wir den User sicher aus dem Token bekommen.
+        challengeService.joinChallenge(request, currentUser);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * NEU: Holt den detaillierten Inhalt einer einzelnen Challenge.
+     * (Entspricht GET /place/challenges?challenge_id=... aus challenge_content.md)
+     */
+    @GetMapping("/challenges/{challengeId}")
+    public ResponseEntity<ChallengeContentDTO> getChallengeContent(
+            @PathVariable UUID challengeId,
+            @AuthenticationPrincipal User currentUser) {
+
+        ChallengeContentDTO content = challengeService.getChallengeContent(challengeId, currentUser);
+        return ResponseEntity.ok(content);
+    }
+
 }

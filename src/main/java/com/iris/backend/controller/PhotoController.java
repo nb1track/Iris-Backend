@@ -76,7 +76,8 @@ public class PhotoController {
                 metadata.googlePlaceId(), // Korrekter Parameter
                 metadata.customPlaceId(),  // Korrekter Parameter
                 uploader,
-                metadata.friendIds()
+                metadata.friendIds(),
+                metadata.challengeId()
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(new PhotoUploadResponse(newPhotoId));

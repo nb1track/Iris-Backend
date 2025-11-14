@@ -167,23 +167,6 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
 
         // Standard-Methode, um die Projektion einfach in das echte DTO umzuwandeln
         default GalleryFeedItemDTO toDTO() {
-            /*return new GalleryFeedItemDTO(
-                    getPlaceType(),
-                    getName(),
-                    getLatitude(),
-                    getLongitude(),
-                    getCoverImageUrl(),
-                    getPhotoCount(),
-                    getNewestPhotoTimestamp(),
-                    getGooglePlaceId(),
-                    getCustomPlaceId(),
-                    getAddress(),
-                    getRadiusMeters(),
-                    getAccessType(),
-                    getIsTrending(),
-                    getIsLive(),
-                    getExpiresAt()
-            );*/
             return null;
         }
     }

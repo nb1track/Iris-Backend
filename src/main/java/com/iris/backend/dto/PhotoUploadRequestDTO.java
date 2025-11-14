@@ -11,5 +11,6 @@ public record PhotoUploadRequestDTO(
         @NotNull PhotoVisibility visibility,
         Long googlePlaceId, // Kann null sein
         UUID customPlaceId,   // Kann null sein
-        List<UUID> friendIds // Für das direkte Teilen mit Freunden
+        List<UUID> friendIds, // Für das direkte Teilen mit Freunden
+        UUID challengeId
 ) {}
