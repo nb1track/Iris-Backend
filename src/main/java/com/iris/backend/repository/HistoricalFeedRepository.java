@@ -167,7 +167,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
 
         // Standard-Methode, um die Projektion einfach in das echte DTO umzuwandeln
         default GalleryFeedItemDTO toDTO() {
-            return new GalleryFeedItemDTO(
+            /*return new GalleryFeedItemDTO(
                     getPlaceType(),
                     getName(),
                     getLatitude(),
@@ -183,7 +183,8 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                     getIsTrending(),
                     getIsLive(),
                     getExpiresAt()
-            );
+            );*/
+            return null;
         }
     }
 }
