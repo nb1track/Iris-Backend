@@ -155,7 +155,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
         double getLongitude();
         String getCoverImageUrl();
         long getPhotoCount();
-        OffsetDateTime getNewestPhotoTimestamp();
+        java.time.Instant getNewestPhotoTimestamp();
         Long getGooglePlaceId();
         UUID getCustomPlaceId();
         String getAddress();

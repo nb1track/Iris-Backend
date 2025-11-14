@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp; // Nicht mehr benötigt
 import java.time.Instant; // Nicht mehr benötigt
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Comparator; // Nicht mehr benötigt
 import java.util.List;
 import java.util.UUID; // Nicht mehr benötigt
@@ -62,6 +64,11 @@ public class HistoricalFeedService {
                     .map(projection -> {
                         String signedUrl = generateSignedUrl(projection.getCoverImageUrl());
 
+                        OffsetDateTime newestPhotoTs = null;
+                        if (projection.getNewestPhotoTimestamp() != null) {
+                            // Wandle den Instant in ein OffsetDateTime (mit UTC als Offset)
+                            newestPhotoTs = projection.getNewestPhotoTimestamp().atOffset(ZoneOffset.UTC);
+                        }
                         // Erstelle das finale DTO
                         return new GalleryFeedItemDTO(
                                 projection.getPlaceType(),
@@ -70,7 +77,7 @@ public class HistoricalFeedService {
                                 projection.getLongitude(),
                                 signedUrl, // Ersetze Objektname durch signierte URL
                                 projection.getPhotoCount(),
-                                projection.getNewestPhotoTimestamp(),
+                                newestPhotoTs,
                                 projection.getGooglePlaceId(),
                                 projection.getCustomPlaceId(),
                                 projection.getAddress(),
