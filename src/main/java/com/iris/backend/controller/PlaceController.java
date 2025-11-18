@@ -31,20 +31,6 @@ public class PlaceController {
         this.googleApiService = googleApiService;
     }
 
-    /**
-     * NEU: Holt den "Entdeckte Spots"-Feed (POIs + Iris Spots).
-     * Nutzt den neuen GalleryFeedService und das GalleryFeedItemDTO.
-     * Ersetzt die alte getNearbyPlaces-Logik.
-     */
-    @GetMapping("/nearby")
-    public ResponseEntity<List<GalleryFeedItemDTO>> getNearbyPlaces( // NEUER RÜCKGABETYP
-                                                                     @RequestParam double latitude,
-                                                                     @RequestParam double longitude) {
-
-        // NEUE LOGIK: Ruft den neuen zentralen Service auf
-        List<GalleryFeedItemDTO> discoveredSpots = galleryFeedService.getDiscoverFeed(latitude, longitude);
-        return ResponseEntity.ok(discoveredSpots);
-    }
 
     /**
      * Holt historische Fotos für einen Google Place.

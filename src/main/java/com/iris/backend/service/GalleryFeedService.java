@@ -68,26 +68,6 @@ public class GalleryFeedService {
         this.googleApiService = googleApiService;
     }
 
-    /**
-     * Holt den "Entdeckt"-Feed (deine "irisShareSpots"-Page).
-     * Zeigt nur Orte an, die aktive, öffentliche Fotos enthalten.
-     */
-    public List<GalleryFeedItemDTO> getDiscoverFeed(double latitude, double longitude) {
-        List<GooglePlace> googlePlaces = googlePlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
-        List<CustomPlace> customPlaces = customPlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
-
-        Stream<GalleryFeedItemDTO> combinedStream = Stream.concat(
-                googlePlaces.stream().map(place -> convertToFeedItem(place, true)), // true = Foto-Infos laden
-                customPlaces.stream().map(place -> convertToFeedItem(place, true))  // true = Foto-Infos laden
-        );
-
-        Comparator<GalleryFeedItemDTO> comparator = Comparator.comparing(GalleryFeedItemDTO::name);
-
-        return combinedStream
-                .filter(item -> item.photoCount() > 0)
-                .sorted(comparator)
-                .collect(Collectors.toList());
-    }
 
     /**
      * Holt alle Orte (Google POIs und Iris Spots) in der Nähe eines Benutzers,
