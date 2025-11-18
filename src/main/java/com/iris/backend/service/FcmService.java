@@ -99,4 +99,39 @@ public class FcmService {
             logger.error("Fehler beim Senden der Standort-Antwort", e);
         }
     }
+
+
+    /**
+     * Sends a "ping" notification to a specific target user using Firebase Cloud Messaging (FCM).
+     *
+     * @param targetToken The FCM token of the target user who will receive the ping notification.
+     * @param sender The user who is sending the ping notification.
+     * @param senderProfileUrl The URL of the sender's profile image, if available.
+     */
+    public void sendPingNotification(String targetToken, User sender, String senderProfileUrl) {
+        if (targetToken == null || targetToken.isEmpty()) return;
+
+        // Baue die Map für die Daten, null-safe
+        Map<String, String> data = new java.util.HashMap<>();
+        data.put("type", "FRIEND_PING");
+        data.put("senderId", sender.getId().toString());
+        data.put("senderUsername", sender.getUsername());
+        data.put("timestamp", java.time.OffsetDateTime.now().toString());
+
+        if (senderProfileUrl != null) {
+            data.put("senderProfileImageUrl", senderProfileUrl);
+        }
+
+        MulticastMessage message = MulticastMessage.builder()
+                .addToken(targetToken)
+                .putAllData(data)
+                .build();
+
+        try {
+            FirebaseMessaging.getInstance().sendMulticast(message);
+            logger.info("Sent PING from {} to token ending in ...{}", sender.getUsername(), targetToken.substring(Math.max(0, targetToken.length() - 6)));
+        } catch (FirebaseMessagingException e) {
+            logger.error("Error sending Ping FCM", e);
+        }
+    }
 }

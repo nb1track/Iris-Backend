@@ -216,4 +216,13 @@ public class FriendshipController {
         friendshipService.reportLocationToRequester(friend, report);
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/ping")
+    public ResponseEntity<Void> pingFriend(
+            @AuthenticationPrincipal User currentUser,
+            @RequestBody com.iris.backend.dto.PingRequestDTO request) {
+
+        friendshipService.pingFriend(currentUser, request.targetUserId());
+        return ResponseEntity.ok().build();
+    }
 }

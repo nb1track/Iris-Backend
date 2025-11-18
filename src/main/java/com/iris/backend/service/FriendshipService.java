@@ -510,4 +510,42 @@ public class FriendshipService {
 
         friendshipRepository.delete(friendship);
     }
+
+    /**
+     * Sendet einen Ping an einen Freund.
+     */
+    @Transactional(readOnly = true)
+    public void pingFriend(User sender, UUID targetUserId) {
+        User target = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // 1. Sicherheits-Check: Sind sie Freunde?
+        boolean areFriends = friendshipRepository.findFriendshipBetweenUsers(sender, target)
+                .map(f -> f.getStatus() == FriendshipStatus.ACCEPTED)
+                .orElse(false);
+
+        if (!areFriends) {
+            throw new SecurityException("You can only ping accepted friends.");
+        }
+
+        // 2. Check FCM Token
+        String targetFcmToken = target.getFcmToken();
+        if (targetFcmToken == null || targetFcmToken.isBlank()) {
+            throw new IllegalStateException("Friend is not reachable (no FCM token).");
+        }
+
+        // 3. Generiere signierte URL für das Sender-Profilbild
+        String senderProfileUrl = null;
+        if (sender.getProfileImageUrl() != null) {
+            senderProfileUrl = gcsStorageService.generateSignedUrl(
+                    profileImagesBucketName,
+                    sender.getProfileImageUrl(),
+                    15,
+                    TimeUnit.MINUTES
+            );
+        }
+
+        // 4. Sende Nachricht
+        fcmService.sendPingNotification(targetFcmToken, sender, senderProfileUrl);
+    }
 }
