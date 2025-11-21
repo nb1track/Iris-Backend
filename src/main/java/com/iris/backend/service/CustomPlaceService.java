@@ -13,7 +13,9 @@ import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -42,12 +44,14 @@ public class CustomPlaceService {
     }
 
     @Transactional
-    public CustomPlace createCustomPlace(CreateCustomPlaceRequestDTO request, User creator) {
+    public CustomPlace createCustomPlace(CreateCustomPlaceRequestDTO request, MultipartFile coverImage, User creator) throws IOException {
         // Sicherheits-Check, ob der User wirklich vor Ort ist.
         Point requestLocation = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
         if (creator.getLastLocation() == null || creator.getLastLocation().distance(requestLocation) > 200) { // 200m Toleranz
             throw new IllegalStateException("User must be near the location to create a custom place.");
         }
+
+        String coverImageObjectName = gcsStorageService.uploadPhoto(coverImage);
 
         CustomPlace newPlace = new CustomPlace();
         newPlace.setCreator(creator);
@@ -57,6 +61,7 @@ public class CustomPlaceService {
         newPlace.setAccessType(request.accessType());
         newPlace.setAccessKey(request.accessKey());
         newPlace.setTrending(request.isTrending());
+        newPlace.setCoverImageUrl(coverImageObjectName);
         newPlace.setLive(request.isLive());
         newPlace.setScheduledLiveAt(request.scheduledLiveAt());
         newPlace.setExpiresAt(request.expiresAt());

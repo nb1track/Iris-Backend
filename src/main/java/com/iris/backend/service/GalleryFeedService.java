@@ -166,18 +166,42 @@ public class GalleryFeedService {
      * Private Helfermethode: Konvertiert ein CustomPlace-Entity in ein DTO.
      */
     private GalleryFeedItemDTO convertToFeedItem(CustomPlace place, boolean loadPhotoInfo) {
-        AggregatedPhotoInfo photoInfo = loadPhotoInfo
-                ? getAggregatedPhotoInfo(null, place.getId())
-                : AggregatedPhotoInfo.EMPTY;
+        String coverUrl = null;
+        long photoCount = 0;
+        OffsetDateTime newestTimestamp = null;
+
+        // 1. Versuche zuerst das statische Cover-Image zu laden
+        if (place.getCoverImageUrl() != null && !place.getCoverImageUrl().isBlank()) {
+            // Wir nutzen denselben Bucket, in den wir es hochgeladen haben (photosBucketName)
+            coverUrl = gcsStorageService.generateSignedUrl(
+                    photosBucketName,
+                    place.getCoverImageUrl(),
+                    60, // Längere Gültigkeit für Feeds ist oft besser, z.B. 60 Min
+                    TimeUnit.MINUTES
+            );
+        }
+
+        // 2. Lade Live-Foto-Infos (Anzahl der Uploads), falls gewünscht
+        if (loadPhotoInfo) {
+            AggregatedPhotoInfo photoInfo = getAggregatedPhotoInfo(null, place.getId());
+            photoCount = photoInfo.count();
+            newestTimestamp = photoInfo.newestPhotoTimestamp();
+
+            // FALLBACK: Wenn kein statisches Cover gesetzt wurde (für alte Spots),
+            // nimm das neueste Foto aus dem Feed.
+            if (coverUrl == null) {
+                coverUrl = photoInfo.coverImageUrl();
+            }
+        }
 
         return new GalleryFeedItemDTO(
                 GalleryPlaceType.IRIS_SPOT,
                 place.getName(),
                 place.getLocation().getY(),
                 place.getLocation().getX(),
-                photoInfo.coverImageUrl(),
-                photoInfo.count(),
-                photoInfo.newestPhotoTimestamp(),
+                coverUrl, // Hier ist jetzt entweder das statische oder das dynamische Bild
+                photoCount,
+                newestTimestamp,
                 null,
                 place.getId(),
                 null,

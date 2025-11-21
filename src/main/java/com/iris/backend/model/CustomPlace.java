@@ -39,6 +39,9 @@ public class CustomPlace {
     @Column(name = "access_key")
     private String accessKey; // For password or QR code content
 
+    @Column(name = "cover_image_url")
+    private String coverImageUrl;
+
     @Column(name = "is_trending")
     private boolean isTrending = false;
 

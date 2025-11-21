@@ -1,5 +1,7 @@
 package com.iris.backend.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iris.backend.dto.*;
 import com.iris.backend.dto.feed.GalleryFeedItemDTO; // NEUES DTO
 import com.iris.backend.model.CustomPlace;
@@ -9,9 +11,11 @@ import com.iris.backend.service.CustomPlaceService;
 import com.iris.backend.service.GalleryFeedService; // NEUER SERVICE
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -23,35 +27,45 @@ public class CustomPlaceController {
     private final CustomPlaceService customPlaceService;
     private final GalleryFeedService galleryFeedService;
     private final ChallengeService challengeService;
+    private final ObjectMapper objectMapper;
 
     // Konstruktor bereinigt: PlaceService ist entfernt
     public CustomPlaceController(CustomPlaceService customPlaceService,
                                  GalleryFeedService galleryFeedService,
-                                 ChallengeService challengeService) {
+                                 ChallengeService challengeService,
+                                 ObjectMapper objectMapper) {
         this.customPlaceService = customPlaceService;
         this.galleryFeedService = galleryFeedService;
         this.challengeService = challengeService;
+        this.objectMapper = objectMapper;
     }
 
     /**
-     * Erstellt einen neuen Custom Place (Iris Spot).
-     * KORRIGIERT: Gibt jetzt ein GalleryFeedItemDTO zurück, um Serialisierungsfehler
-     * des 'Point'-Objekts zu vermeiden und konsistent mit anderen Endpunkten zu sein.
+     * Erstellt einen neuen Custom Place (Iris Spot) mit Cover-Bild.
+     * Nutzt Multipart-Request:
+     * - Teil 'data': JSON String von CreateCustomPlaceRequestDTO
+     * - Teil 'image': Die Bilddatei
      */
-    @PostMapping
-    public ResponseEntity<GalleryFeedItemDTO> createCustomPlace( // <-- RÜCKGABETYP GEÄNDERT
-                                                                 @RequestBody CreateCustomPlaceRequestDTO request,
-                                                                 @AuthenticationPrincipal User currentUser) {
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<GalleryFeedItemDTO> createCustomPlace(
+            @RequestPart("data") String dataJson,
+            @RequestPart("image") MultipartFile coverImage,
+            @AuthenticationPrincipal User currentUser) throws JsonProcessingException {
 
-        // 1. Erstelle den Spot in der Datenbank (gibt das Entity zurück)
-        CustomPlace newPlaceEntity = customPlaceService.createCustomPlace(request, currentUser);
+        // 1. Parse das JSON manuell
+        CreateCustomPlaceRequestDTO request = objectMapper.readValue(dataJson, CreateCustomPlaceRequestDTO.class);
 
-        // 2. Konvertiere das Entity in ein DTO für die Antwort
-        //    'false', da ein neuer Spot per Definition noch keine Fotos hat.
-        GalleryFeedItemDTO newPlaceDTO = galleryFeedService.getFeedItemForPlace(newPlaceEntity, false);
+        // 2. Erstelle den Spot (inklusive Bild-Upload im Service)
+        try {
+            CustomPlace newPlaceEntity = customPlaceService.createCustomPlace(request, coverImage, currentUser);
 
-        // 3. Gib das DTO zurück
-        return ResponseEntity.status(HttpStatus.CREATED).body(newPlaceDTO); // <-- BODY GEÄNDERT
+            // 3. Konvertiere das Entity in ein DTO
+            GalleryFeedItemDTO newPlaceDTO = galleryFeedService.getFeedItemForPlace(newPlaceEntity, true);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(newPlaceDTO);
+        } catch (Exception e) {
+            throw new RuntimeException("Fehler beim Erstellen des Custom Places: " + e.getMessage());
+        }
     }
 
     /**
