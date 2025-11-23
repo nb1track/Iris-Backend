@@ -243,49 +243,76 @@ public class PhotoService {
         return photos.stream().map(this::toPhotoResponseDTO).collect(Collectors.toList());
     }
 
+    // === GOOGLE PLACES ===
+
     /**
-     * Retrieves a list of historical photos related to a specific Google Place, utilizing provided historical data points.
-     *
-     * @param googlePlaceId the unique identifier for the Google Place
-     * @param history the list of historical data points to match against when fetching photos
-     * @return a list of PhotoResponseDTO objects representing the photos associated with the given Google Place and historical data
+     * Holt Fotos von ANDEREN (Public).
      */
     @Transactional(readOnly = true)
-    public List<PhotoResponseDTO> findHistoricalPhotosForGooglePlace(Long googlePlaceId, List<HistoricalPointDTO> history) {
-        if (history == null || history.isEmpty()) {
-            return List.of();
-        }
+    public List<PhotoResponseDTO> findHistoricalPhotosForGooglePlaceFromOthers(Long googlePlaceId, List<HistoricalPointDTO> history, User currentUser) {
+        if (history == null || history.isEmpty()) return List.of();
         try {
             String historyJson = objectMapper.writeValueAsString(history);
-            // Ruft die neue, spezifische Repository-Methode auf
-            List<Photo> photos = photoRepository.findPhotosForGooglePlaceMatchingHistoricalBatch(googlePlaceId, historyJson);
-            return photos.stream()
-                    .map(this::toPhotoResponseDTO)
-                    .collect(Collectors.toList());
+            // Ruft die neue Repo-Methode mit excludeUserId auf
+            List<Photo> photos = photoRepository.findPhotosForGooglePlaceMatchingHistoricalBatchFromOthers(
+                    googlePlaceId, historyJson, currentUser.getId()
+            );
+            return photos.stream().map(this::toPhotoResponseDTO).collect(Collectors.toList());
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing historical photo data", e);
         }
     }
 
     /**
-     * Finds and retrieves historical photos for a specific custom place based on the provided historical data points.
-     *
-     * @param customPlaceId the unique identifier of the custom place for which historical photos are to be retrieved
-     * @param history a list of historical data points represented as HistoricalPointDTO objects
-     * @return a list of PhotoResponseDTO containing the details of the historical photos, or an empty list if no applicable photos are found
+     * Holt NUR MEINE Fotos.
      */
     @Transactional(readOnly = true)
-    public List<PhotoResponseDTO> findHistoricalPhotosForCustomPlace(UUID customPlaceId, List<HistoricalPointDTO> history) {
-        if (history == null || history.isEmpty()) {
-            return List.of();
-        }
+    public List<PhotoResponseDTO> findHistoricalPhotosForGooglePlaceFromUser(Long googlePlaceId, List<HistoricalPointDTO> history, User currentUser) {
+        if (history == null || history.isEmpty()) return List.of();
         try {
             String historyJson = objectMapper.writeValueAsString(history);
-            // Ruft die neue, spezifische Repository-Methode auf
-            List<Photo> photos = photoRepository.findPhotosForCustomPlaceMatchingHistoricalBatch(customPlaceId, historyJson);
-            return photos.stream()
-                    .map(this::toPhotoResponseDTO)
-                    .collect(Collectors.toList());
+            // Ruft die neue Repo-Methode mit targetUserId auf
+            List<Photo> photos = photoRepository.findPhotosForGooglePlaceMatchingHistoricalBatchFromUser(
+                    googlePlaceId, historyJson, currentUser.getId()
+            );
+            return photos.stream().map(this::toPhotoResponseDTO).collect(Collectors.toList());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Error processing historical photo data", e);
+        }
+    }
+
+
+    // === CUSTOM PLACES ===
+
+    /**
+     * Holt Fotos von ANDEREN (Public) für Custom Places.
+     */
+    @Transactional(readOnly = true)
+    public List<PhotoResponseDTO> findHistoricalPhotosForCustomPlaceFromOthers(UUID customPlaceId, List<HistoricalPointDTO> history, User currentUser) {
+        if (history == null || history.isEmpty()) return List.of();
+        try {
+            String historyJson = objectMapper.writeValueAsString(history);
+            List<Photo> photos = photoRepository.findPhotosForCustomPlaceMatchingHistoricalBatchFromOthers(
+                    customPlaceId, historyJson, currentUser.getId()
+            );
+            return photos.stream().map(this::toPhotoResponseDTO).collect(Collectors.toList());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Error processing historical photo data", e);
+        }
+    }
+
+    /**
+     * Holt NUR MEINE Fotos für Custom Places.
+     */
+    @Transactional(readOnly = true)
+    public List<PhotoResponseDTO> findHistoricalPhotosForCustomPlaceFromUser(UUID customPlaceId, List<HistoricalPointDTO> history, User currentUser) {
+        if (history == null || history.isEmpty()) return List.of();
+        try {
+            String historyJson = objectMapper.writeValueAsString(history);
+            List<Photo> photos = photoRepository.findPhotosForCustomPlaceMatchingHistoricalBatchFromUser(
+                    customPlaceId, historyJson, currentUser.getId()
+            );
+            return photos.stream().map(this::toPhotoResponseDTO).collect(Collectors.toList());
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing historical photo data", e);
         }

@@ -2,13 +2,14 @@ package com.iris.backend.controller;
 
 import com.iris.backend.dto.HistoricalSearchRequestDTO;
 import com.iris.backend.dto.PhotoResponseDTO;
-import com.iris.backend.dto.PlaceDTO;
 import com.iris.backend.dto.feed.GalleryFeedItemDTO;
+import com.iris.backend.model.User;
 import com.iris.backend.service.GoogleApiService;
 import com.iris.backend.service.PhotoService;
 import com.iris.backend.service.GalleryFeedService;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,35 +33,79 @@ public class PlaceController {
     }
 
 
+// --- GOOGLE PLACES ---
+
     /**
-     * Holt historische Fotos für einen Google Place.
-     * Diese Methode bleibt unverändert, da sie den PhotoService nutzt.
+     * 1. Pictures from OTHERS (Public)
+     * Pfad: places/google-places/$placeId/historical-photos
      */
     @PostMapping("/google-places/{placeId}/historical-photos")
-    public ResponseEntity<List<PhotoResponseDTO>> getHistoricalPhotosForGooglePlace(
-            @PathVariable Long placeId, // Erwartet eine Long ID
-            @RequestBody HistoricalSearchRequestDTO searchRequest
+    public ResponseEntity<List<PhotoResponseDTO>> getHistoricalPhotosForGooglePlaceFromOthers(
+            @PathVariable Long placeId,
+            @RequestBody HistoricalSearchRequestDTO searchRequest,
+            @AuthenticationPrincipal User currentUser // User wird benötigt zum Ausschließen
     ) {
-        List<PhotoResponseDTO> photos = photoService.findHistoricalPhotosForGooglePlace(
+        List<PhotoResponseDTO> photos = photoService.findHistoricalPhotosForGooglePlaceFromOthers(
                 placeId,
-                searchRequest.history()
+                searchRequest.history(),
+                currentUser
+        );
+        return ResponseEntity.ok(photos);
+    }
+
+    /**
+     * 2. YOUR shared Photos
+     * Pfad: places/google-places/$placeId/historical-photos/my-photos
+     */
+    @PostMapping("/google-places/{placeId}/historical-photos/my-photos")
+    public ResponseEntity<List<PhotoResponseDTO>> getMyHistoricalPhotosForGooglePlace(
+            @PathVariable Long placeId,
+            @RequestBody HistoricalSearchRequestDTO searchRequest,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        List<PhotoResponseDTO> photos = photoService.findHistoricalPhotosForGooglePlaceFromUser(
+                placeId,
+                searchRequest.history(),
+                currentUser
         );
         return ResponseEntity.ok(photos);
     }
 
 
+    // --- CUSTOM PLACES ---
+
     /**
-     * Holt historische Fotos für einen Custom Place (Iris Spot).
-     * Diese Methode bleibt unverändert, da sie den PhotoService nutzt.
+     * 3. Pictures from OTHERS (Public)
+     * Pfad: places/custom-places/$placeId/historical-photos
      */
     @PostMapping("/custom-places/{placeId}/historical-photos")
-    public ResponseEntity<List<PhotoResponseDTO>> getHistoricalPhotosForCustomPlace(
-            @PathVariable UUID placeId, // Erwartet eine UUID
-            @RequestBody HistoricalSearchRequestDTO searchRequest
+    public ResponseEntity<List<PhotoResponseDTO>> getHistoricalPhotosForCustomPlaceFromOthers(
+            @PathVariable UUID placeId,
+            @RequestBody HistoricalSearchRequestDTO searchRequest,
+            @AuthenticationPrincipal User currentUser
     ) {
-        List<PhotoResponseDTO> photos = photoService.findHistoricalPhotosForCustomPlace(
+        List<PhotoResponseDTO> photos = photoService.findHistoricalPhotosForCustomPlaceFromOthers(
                 placeId,
-                searchRequest.history()
+                searchRequest.history(),
+                currentUser
+        );
+        return ResponseEntity.ok(photos);
+    }
+
+    /**
+     * 4. YOUR shared Photos
+     * Pfad: places/custom-places/$placeId/historical-photos/my-photos
+     */
+    @PostMapping("/custom-places/{placeId}/historical-photos/my-photos")
+    public ResponseEntity<List<PhotoResponseDTO>> getMyHistoricalPhotosForCustomPlace(
+            @PathVariable UUID placeId,
+            @RequestBody HistoricalSearchRequestDTO searchRequest,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        List<PhotoResponseDTO> photos = photoService.findHistoricalPhotosForCustomPlaceFromUser(
+                placeId,
+                searchRequest.history(),
+                currentUser
         );
         return ResponseEntity.ok(photos);
     }
