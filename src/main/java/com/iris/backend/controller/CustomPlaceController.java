@@ -72,11 +72,12 @@ public class CustomPlaceController {
      * Holt die Teilnehmer eines Custom Place (User, die dort hochgeladen haben).
      */
     @GetMapping("/{placeId}/participants")
-    public ResponseEntity<List<UserDTO>> getParticipantsForPlace(
-            @PathVariable UUID placeId,
-            @AuthenticationPrincipal User currentUser) {
+    public ResponseEntity<List<ParticipantDTO>> getParticipantsForPlace( // Typ geändert
+                                                                         @PathVariable UUID placeId,
+                                                                         @AuthenticationPrincipal User currentUser) {
         try {
-            List<UserDTO> participants = customPlaceService.getParticipants(placeId, currentUser);
+            // Service gibt jetzt ParticipantDTO zurück
+            List<ParticipantDTO> participants = customPlaceService.getParticipants(placeId, currentUser);
             return ResponseEntity.ok(participants);
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();

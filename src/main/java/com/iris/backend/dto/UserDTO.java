@@ -14,4 +14,7 @@ import java.util.UUID;
  * - id: A UUID representing the unique identifier of the user.
  * - username: The username associated with the user.
  */
-public record UserDTO(UUID id, String username, String profileImageUrl) {}
+public record UserDTO(UUID id,
+                      String username,
+                      String profileImageUrl
+) {}
