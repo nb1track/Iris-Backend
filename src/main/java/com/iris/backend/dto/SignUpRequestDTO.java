@@ -1,13 +1,15 @@
 package com.iris.backend.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 /**
- * Represents a data transfer object (DTO) for a user signup request.
- *
- * This DTO encapsulates the necessary details required for a user
- * to register or sign up within the system. Specifically, it includes
- * the username chosen by the user during the signup process.
- *
- * Fields:
- * - username: The unique username selected by the user for their account.
+ * Represents the payload for a user signup request.
+ * Matches the structure defined in signup.md.
  */
-public record SignUpRequestDTO(String username, String base64Image) {}
+public record SignUpRequestDTO(
+        @NotBlank String username,
+        @NotBlank String firstname,
+        @NotBlank String lastname,
+        String base64Image, // Optional, falls der User kein Bild hochlädt
+        String phoneNumber
+) {}

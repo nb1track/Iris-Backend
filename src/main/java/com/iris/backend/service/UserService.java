@@ -123,30 +123,48 @@ public class UserService {
         userRepository.delete(user);
     }
 
-    public User registerNewUser(FirebaseToken decodedToken, String username, String base64Image) {
+    @Transactional // Wichtig für Datenbank-Konsistenz
+    public User registerNewUser(FirebaseToken decodedToken, SignUpRequestDTO signUpRequest) {
         if (userRepository.findByFirebaseUid(decodedToken.getUid()).isPresent()) {
-            logger.warn("Attempted to register an already existing user with UID: {}", decodedToken.getUid()); // NEU
+            logger.warn("Attempted to register an already existing user with UID: {}", decodedToken.getUid());
             throw new IllegalStateException("User already exists in our database.");
         }
+
         User newUser = new User();
         newUser.setFirebaseUid(decodedToken.getUid());
         newUser.setEmail(decodedToken.getEmail());
-        newUser.setUsername(username);
 
-        byte[] imageBytes;
-        try {
-            imageBytes = Base64.getDecoder().decode(base64Image);
-        } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Invalid base64 image provided.");
+        // Mapping der neuen Felder aus dem DTO
+        newUser.setUsername(signUpRequest.username());
+        newUser.setFirstname(signUpRequest.firstname());
+        newUser.setLastname(signUpRequest.lastname());
+        newUser.setPhoneNumber(signUpRequest.phoneNumber());
+
+        // Profilbild Verarbeitung
+        if (signUpRequest.base64Image() != null && !signUpRequest.base64Image().isBlank()) {
+            try {
+                // Bereinigen des Base64 Strings falls Header vorhanden sind (data:image/png;base64,...)
+                String cleanBase64 = signUpRequest.base64Image();
+                if (cleanBase64.contains(",")) {
+                    cleanBase64 = cleanBase64.split(",")[1];
+                }
+
+                byte[] imageBytes = Base64.getDecoder().decode(cleanBase64);
+
+                // Upload in GCS
+                String imageUrl = gcsStorageService.uploadProfileImage(decodedToken.getUid(), imageBytes);
+                newUser.setProfileImageUrl(imageUrl);
+
+            } catch (IllegalArgumentException e) {
+                logger.error("Invalid base64 image provided for user {}", signUpRequest.username(), e);
+                // Wir werfen hier keinen Fehler, damit die Registrierung nicht fehlschlägt,
+                // nur weil das Bild kaputt ist. Der User hat dann einfach kein Bild.
+            }
         }
 
-        // KORRIGIERT: Speichert nur den Objektnamen, den die neue Methode zurückgibt
-        String imageUrl = gcsStorageService.uploadProfileImage(decodedToken.getUid(), imageBytes);
-        newUser.setProfileImageUrl(imageUrl);
-
-        logger.info("--> Attempting to save new user '{}' with UID {}", username, decodedToken.getUid()); // NEU
+        logger.info("--> Attempting to save new user '{}' with UID {}", signUpRequest.username(), decodedToken.getUid());
         User savedUser = userRepository.save(newUser);
-        logger.info("<-- Successfully saved new user with database ID {}", savedUser.getId()); // NEU
+        logger.info("<-- Successfully saved new user with database ID {}", savedUser.getId());
         return savedUser;
     }
 

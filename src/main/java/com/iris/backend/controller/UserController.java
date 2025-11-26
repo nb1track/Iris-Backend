@@ -87,7 +87,7 @@ public class UserController {
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(
             @RequestHeader("Authorization") String authHeader,
-            @RequestBody SignUpRequestDTO signUpRequest) {
+            @RequestBody @Valid SignUpRequestDTO signUpRequest) { // @Valid aktiviert die @NotBlank Checks im DTO
 
         logger.info("====== SIGNUP ENDPOINT REACHED for user: {} ======", signUpRequest.username());
 
@@ -97,22 +97,27 @@ public class UserController {
         String idToken = authHeader.substring(7);
 
         try {
+            // 1. Token verifizieren
             FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
-            User newUser = userService.registerNewUser(decodedToken, signUpRequest.username(), signUpRequest.base64Image());
+
+            // 2. User registrieren (Service kümmert sich um alle Felder)
+            User newUser = userService.registerNewUser(decodedToken, signUpRequest);
+
+            // 3. Antwort bauen
             UserDTO userDTO = new UserDTO(newUser.getId(), newUser.getUsername(), newUser.getProfileImageUrl());
             return ResponseEntity.status(HttpStatus.CREATED).body(userDTO);
 
         } catch (FirebaseAuthException e) {
             logger.error("!!! FIREBASE TOKEN VERIFICATION FAILED !!!", e);
-
-            // --- DAS IST DIE ENTSCHEIDENDE ÄNDERUNG ---
-            // Wir erstellen eine detaillierte Fehlermeldung
-            String errorMessage = "Firebase Auth Error: " + e.getMessage() + " | Error Code: " + e.getAuthErrorCode().toString();
-            // Und senden sie mit dem Status 401 zurück
+            String errorMessage = "Firebase Auth Error: " + e.getMessage();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorMessage);
 
         } catch (IllegalStateException e) {
+            // User existiert bereits
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        } catch (Exception e) {
+            logger.error("Unexpected error during signup", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred.");
         }
     }
 
