@@ -173,8 +173,8 @@ public class UserController {
     }
 
     /**
-     * Checks if a user is allowed to register with the provided phone number.
-     * This endpoint is public to allow pre-registration checks.
+     * Prüft, ob ein User aufgrund seiner Telefonnummer gesperrt ist.
+     * Gibt true zurück, wenn der User NICHT gesperrt ist.
      */
     @PostMapping("/checkAllowed")
     public ResponseEntity<Boolean> checkAllowed(@RequestBody CheckAllowedRequestDTO request) {

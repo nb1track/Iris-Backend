@@ -5,6 +5,7 @@ import com.iris.backend.model.Friendship;
 import com.iris.backend.model.Photo;
 import com.iris.backend.model.User;
 import com.iris.backend.model.enums.FriendshipStatus;
+import com.iris.backend.repository.BlockedNumberRepository;
 import com.iris.backend.repository.FriendshipRepository;
 import com.iris.backend.repository.PhotoRepository;
 import com.iris.backend.repository.UserRepository;
@@ -36,6 +37,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PhotoRepository photoRepository;
     private final FriendshipRepository friendshipRepository;
+    private final BlockedNumberRepository blockedNumberRepository;
     private final GcsStorageService gcsStorageService;
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
     private static final Logger logger = LoggerFactory.getLogger(UserService.class); // NEU
@@ -46,6 +48,7 @@ public class UserService {
             UserRepository userRepository,
             PhotoRepository photoRepository,
             FriendshipRepository friendshipRepository,
+            BlockedNumberRepository blockedNumberRepository,
             GcsStorageService gcsStorageService,
             @Value("${gcs.bucket.photos.name}") String photosBucketName,
             @Value("${gcs.bucket.profile-images.name}") String profileImagesBucketName
@@ -53,6 +56,7 @@ public class UserService {
         this.userRepository = userRepository;
         this.photoRepository = photoRepository;
         this.friendshipRepository = friendshipRepository;
+        this.blockedNumberRepository = blockedNumberRepository;
         this.gcsStorageService = gcsStorageService;
         this.photosBucketName = photosBucketName;
         this.profileImagesBucketName = profileImagesBucketName;
@@ -291,20 +295,19 @@ public class UserService {
     }
 
     /**
-     * Checks if a user is allowed to register based on the phone number.
-     * Currently checks if the phone number is unique (not already taken).
+     * Prüft, ob ein Benutzer (basierend auf der Telefonnummer) für die Registrierung zugelassen ist.
+     * Logik: Erlaubt, wenn die Nummer NICHT in der Sperrliste (blocked_numbers) steht.
      *
-     * @param phoneNumber The phone number to check.
-     * @return true if the user is allowed to create an account, false otherwise.
+     * @param phoneNumber Die zu prüfende Telefonnummer.
+     * @return true wenn der User NICHT blockiert ist, sonst false.
      */
     @Transactional(readOnly = true)
     public boolean checkAllowed(String phoneNumber) {
         if (phoneNumber == null || phoneNumber.isBlank()) {
             return false;
         }
-        // Logik: Erlaubt, wenn die Nummer NICHT existiert.
-        // Falls du eine Closed-Beta-Liste hast, würde hier stehen:
-        // return allowListRepository.existsByPhoneNumber(phoneNumber) && !userRepository.existsByPhoneNumber(phoneNumber);
-        return !userRepository.existsByPhoneNumber(phoneNumber);
+        // Wenn die Nummer existiert, ist sie blockiert -> return false (nicht allowed)
+        // Wenn sie NICHT existiert -> return true (allowed)
+        return !blockedNumberRepository.existsByPhoneNumber(phoneNumber);
     }
 }
