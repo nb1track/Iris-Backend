@@ -16,6 +16,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByFirebaseUid(String firebaseUid);
 
+    boolean existsByPhoneNumber(String phoneNumber);
+
     /**
      * Findet alle Benutzer aus einer gegebenen Liste von IDs (Freunden),
      * die sich innerhalb eines bestimmten Radius um einen gegebenen Punkt befinden.

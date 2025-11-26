@@ -171,4 +171,14 @@ public class UserController {
         userService.updateFcmToken(currentUser, request.token());
         return ResponseEntity.ok().build();
     }
+
+    /**
+     * Checks if a user is allowed to register with the provided phone number.
+     * This endpoint is public to allow pre-registration checks.
+     */
+    @PostMapping("/checkAllowed")
+    public ResponseEntity<Boolean> checkAllowed(@RequestBody CheckAllowedRequestDTO request) {
+        boolean isAllowed = userService.checkAllowed(request.phoneNumber());
+        return ResponseEntity.ok(isAllowed);
+    }
 }

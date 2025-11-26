@@ -289,4 +289,22 @@ public class UserService {
         // Die .map()-Funktion von Page macht das sehr elegant
         return userPage.map(this::getUserProfile); // Wir können hier die existierende Methode wiederverwenden!
     }
+
+    /**
+     * Checks if a user is allowed to register based on the phone number.
+     * Currently checks if the phone number is unique (not already taken).
+     *
+     * @param phoneNumber The phone number to check.
+     * @return true if the user is allowed to create an account, false otherwise.
+     */
+    @Transactional(readOnly = true)
+    public boolean checkAllowed(String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            return false;
+        }
+        // Logik: Erlaubt, wenn die Nummer NICHT existiert.
+        // Falls du eine Closed-Beta-Liste hast, würde hier stehen:
+        // return allowListRepository.existsByPhoneNumber(phoneNumber) && !userRepository.existsByPhoneNumber(phoneNumber);
+        return !userRepository.existsByPhoneNumber(phoneNumber);
+    }
 }
