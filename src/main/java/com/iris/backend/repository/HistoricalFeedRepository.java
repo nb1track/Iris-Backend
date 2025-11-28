@@ -55,7 +55,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 ST_MakePoint(h.longitude, h.latitude)::geography,
                 gp.radius_meters -- Nutzt den individuellen Radius des POI
             )
-            WHERE p.visibility = 'PUBLIC'
+            WHERE (p.visibility = 'PUBLIC' OR p.visibility = 'VISIBLE_TO_ALL')
               AND p.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
         ),
         
@@ -83,7 +83,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 ST_MakePoint(h.longitude, h.latitude)::geography,
                 cp.radius_meters -- Nutzt den individuellen Radius des Spots
             )
-            WHERE p.visibility = 'PUBLIC'
+            WHERE (p.visibility = 'PUBLIC' OR p.visibility = 'VISIBLE_TO_ALL')
               AND p.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
         ),
         

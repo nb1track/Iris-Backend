@@ -129,7 +129,7 @@ public class PhotoService {
                 challengeCompletionRepository.save(completion);
             }
 
-            if (savedPhoto.getVisibility() == PhotoVisibility.FRIENDS) {
+            if (savedPhoto.getVisibility() == PhotoVisibility.FRIENDS || savedPhoto.getVisibility() == PhotoVisibility.VISIBLE_TO_ALL) {
                 List<User> friends = friendshipService.getFriendsAsEntities(uploader.getId());
                 List<String> friendTokens = friends.stream()
                         .map(User::getFcmToken)
@@ -204,8 +204,8 @@ public class PhotoService {
             return toPhotoResponseDTO(photo);
         }
 
-        // 2. Fall: Das Foto ist PUBLIC
-        if (photo.getVisibility() == PhotoVisibility.PUBLIC) {
+        // 2. PUBLIC oder VISIBLE_TO_ALL -> Jeder darf es sehen
+        if (photo.getVisibility() == PhotoVisibility.PUBLIC || photo.getVisibility() == PhotoVisibility.VISIBLE_TO_ALL) {
             return toPhotoResponseDTO(photo);
         }
 
@@ -234,13 +234,25 @@ public class PhotoService {
     }
 
     public List<PhotoResponseDTO> getFriendsFeed(UUID userId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
         List<User> friends = friendshipService.getFriendsAsEntities(user.getId());
-        if (friends.isEmpty()) { return List.of(); }
-        List<Photo> photos = photoRepository.findAllByUploaderInAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(
-                friends, PhotoVisibility.FRIENDS, OffsetDateTime.now()
+
+        if (friends.isEmpty()) {
+            return List.of();
+        }
+
+        // KORREKTUR: Nutzt jetzt die Custom-Query, die sowohl 'FRIENDS'
+        // als auch 'VISIBLE_TO_ALL' berücksichtigt.
+        List<Photo> photos = photoRepository.findFriendsFeedPhotos(
+                friends,
+                OffsetDateTime.now()
         );
-        return photos.stream().map(this::toPhotoResponseDTO).collect(Collectors.toList());
+
+        return photos.stream()
+                .map(this::toPhotoResponseDTO)
+                .collect(Collectors.toList());
     }
 
     // === GOOGLE PLACES ===

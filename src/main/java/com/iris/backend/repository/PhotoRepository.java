@@ -42,7 +42,7 @@ JOIN
     )
 WHERE
     ph.google_place_id = :googlePlaceId
-    AND ph.visibility = 'PUBLIC'
+    AND (ph.visibility = 'PUBLIC' OR ph.visibility = 'VISIBLE_TO_ALL')
     AND ph.uploader_id != :excludeUserId  -- WICHTIG: Eigene Fotos ausschließen
     AND ph.uploaded_at BETWEEN (h."timestamp" - interval '5 hours') AND h."timestamp"
 ORDER BY ph.uploaded_at DESC
@@ -116,7 +116,7 @@ ORDER BY ph.uploaded_at DESC
             )
         WHERE
             ph.custom_place_id = ?1
-            AND ph.visibility = 'PUBLIC'
+            AND (ph.visibility = 'PUBLIC' OR ph.visibility = 'VISIBLE_TO_ALL')
             AND ph.uploader_id != ?3 -- WICHTIG: Eigene ausschließen
             AND ph.uploaded_at BETWEEN (h."timestamp" - interval '5 hours') AND h."timestamp"
         ORDER BY ph.uploaded_at DESC
@@ -156,11 +156,13 @@ ORDER BY ph.uploaded_at DESC
 
 
     // --- Bestehende Methoden (unverändert lassen, falls woanders benötigt) ---
-    List<Photo> findAllByUploaderInAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(
-            List<User> uploaders,
-            PhotoVisibility visibility,
-            OffsetDateTime currentTime
-    );
+    /**
+     * Findet alle Fotos für den Freunde-Feed.
+     * Das beinhaltet Fotos mit Visibility 'FRIENDS' UND 'VISIBLE_TO_ALL' (Hybrid).
+     * Fotos mit Visibility 'PUBLIC' (was jetzt "Nur Spot" bedeutet) werden hier NICHT geladen.
+     */
+    @Query("SELECT p FROM Photo p WHERE p.uploader IN :friends AND (p.visibility = 'FRIENDS' OR p.visibility = 'VISIBLE_TO_ALL') AND p.expiresAt > :now ORDER BY p.uploadedAt DESC")
+    List<Photo> findFriendsFeedPhotos(@Param("friends") List<User> friends, @Param("now") OffsetDateTime now);
 
     List<Photo> findAllByUploader(User uploader);
 

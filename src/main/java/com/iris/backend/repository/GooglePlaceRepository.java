@@ -16,7 +16,7 @@ public interface GooglePlaceRepository extends JpaRepository<GooglePlace, Long> 
     @Query(value = """
     SELECT DISTINCT p.* FROM google_places p
     JOIN photos ph ON p.id = ph.google_place_id 
-    WHERE ph.visibility = 'PUBLIC'
+    WHERE (p.visibility = 'PUBLIC' OR p.visibility = 'VISIBLE_TO_ALL')
       AND ph.uploaded_at BETWEEN (:timestamp - interval '5 hours') AND :timestamp
       AND ST_DWithin(p.location, ST_MakePoint(:longitude, :latitude)::geography, :radiusInMeters)
     """, nativeQuery = true)
