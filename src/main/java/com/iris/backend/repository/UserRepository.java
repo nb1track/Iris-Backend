@@ -62,6 +62,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      * @param pageable Das Pageable-Objekt, das Paginierungs- und Sortierinformationen enthält.
      * @return Eine Seite (Page) von User-Objekten.
      */
-    @Query("SELECT u FROM User u WHERE u.username ILIKE %:query% AND u.id != :currentUserId")
-    Page<User> searchUsers(String query, UUID currentUserId, Pageable pageable);
+    @Query("SELECT u FROM User u WHERE LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) AND u.id != :currentUserId")
+    Page<User> searchUsers(@Param("query") String query, @Param("currentUserId") UUID currentUserId, Pageable pageable);
 }
