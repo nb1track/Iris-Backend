@@ -48,7 +48,7 @@ public class FriendshipService {
     private String profileImagesBucketName;
     private static final Logger logger = LoggerFactory.getLogger(FriendshipService.class);
 
-    private static final double MAX_DISTANCE_METERS = 50.0;
+    private static final double MAX_DISTANCE_METERS = 50000000.0;
 
     /**
      * Konstruktor aktualisiert mit GcsStorageService
