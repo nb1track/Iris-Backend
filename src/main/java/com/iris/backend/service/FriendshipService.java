@@ -203,43 +203,14 @@ public class FriendshipService {
     /**
      * Sends a friend request from one user to another.
      *
-     * This method verifies the geographical proximity of the two users,
-     * the freshness of their location data, and other criteria before
-     * allowing a friend request to be sent. If all conditions are met,
-     * a new friendship with a "PENDING" status is created.
-     *
-     * @param requester the User entity sending the friend request
-     * @param addresseeId the unique identifier of the User receiving the friend request
-     * @throws RuntimeException if the addressee is not found
-     * @throws IllegalStateException if the location of either user is unavailable or outdated
-     * @throws SecurityException if the users are not within the maximum allowed distance
+     * UPDATE: Standort- und Zeit-Checks wurden entfernt, damit man Freunde
+     * auch über die globale Suche hinzufügen kann, egal wo sie sind.
      */
     public void sendFriendRequest(User requester, UUID addresseeId) {
         User addressee = userRepository.findById(addresseeId)
                 .orElseThrow(() -> new RuntimeException("Addressee not found"));
 
-        // Standort-Check
-        Point requesterLocation = requester.getLastLocation();
-        Point addresseeLocation = addressee.getLastLocation();
-
-        if (requesterLocation == null || addresseeLocation == null) {
-            throw new IllegalStateException("User location not available.");
-        }
-
-        // Zeit-Check
-        long requesterLocAge = Duration.between(requester.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes();
-        long addresseeLocAge = Duration.between(addressee.getLastLocationUpdatedAt(), OffsetDateTime.now()).toMinutes();
-
-        if (requesterLocAge > 5 || addresseeLocAge > 5) {
-            throw new IllegalStateException("User location is outdated.");
-        }
-
-        // Distanz-Check
-        double distance = requesterLocation.distance(addresseeLocation);
-        if (distance > MAX_DISTANCE_METERS) {
-            throw new SecurityException("Users are not close enough to send a friend request.");
-        }
-
+        // Sortierung für konsistente Speicherung (verhindert A->B und B->A Duplikate)
         User userOne = requester.getId().compareTo(addressee.getId()) < 0 ? requester : addressee;
         User userTwo = requester.getId().compareTo(addressee.getId()) < 0 ? addressee : requester;
 
