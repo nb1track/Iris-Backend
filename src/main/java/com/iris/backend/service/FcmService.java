@@ -1,8 +1,8 @@
 package com.iris.backend.service;
 
 import com.iris.backend.model.Photo;
-import com.google.firebase.messaging.*;
 import com.iris.backend.model.User;
+import com.google.firebase.messaging.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -16,13 +16,13 @@ public class FcmService {
 
     private static final Logger logger = LoggerFactory.getLogger(FcmService.class);
 
-    @Async // Wichtig: Führt die Methode in einem separaten Thread aus
+    @Async
     public void sendNewPhotoNotification(List<String> tokens, Photo photo) {
         if (tokens.isEmpty()) {
             return;
         }
 
-        // Das ist eine "Data Message" (Silent Push). Sie hat KEIN "notification"-Feld.
+        // MulticastMessage ist weiterhin korrekt, aber wir nutzen die neue Send-Methode
         MulticastMessage message = MulticastMessage.builder()
                 .putAllData(Map.of(
                         "type", "NEW_FRIEND_PHOTO",
@@ -33,21 +33,26 @@ public class FcmService {
                 .addAllTokens(tokens)
                 .build();
         try {
-            BatchResponse response = FirebaseMessaging.getInstance().sendMulticast(message);
+            // WICHTIG: sendEachForMulticast statt sendMulticast verwenden!
+            // sendEachForMulticast nutzt die HTTP v1 API.
+            BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
+
             logger.info("Successfully sent FCM message to {} devices.", response.getSuccessCount());
+
             if (response.getFailureCount() > 0) {
-                // Hier könntest du Logik hinzufügen, um ungültige Tokens aus der DB zu entfernen
                 logger.warn("Failed to send FCM message to {} devices.", response.getFailureCount());
+                // Optional: Fehleranalyse für einzelne Tokens
+                response.getResponses().forEach(r -> {
+                   if (!r.isSuccessful()) logger.error("Failure: {}", r.getException().getMessage());
+                });
             }
         } catch (FirebaseMessagingException e) {
-            logger.error("Error sending FCM message", e);
+            logger.error("Error sending FCM message via HTTP v1", e);
         }
     }
 
     /**
-     * NEU: Sendet eine "Bitte-sende-mir-deinen-Standort"-Anfrage an eine Liste von Freunden.
-     * @param friendTokens Die FCM-Tokens der Freunde (B, C, D...)
-     * @param requesterFcmToken Das FCM-Token des Anfragers (User A)
+     * Sendet eine "Bitte-sende-mir-deinen-Standort"-Anfrage an eine Liste von Freunden.
      */
     @Async
     public void sendLocationRefreshRequest(List<String> friendTokens, String requesterFcmToken) {
@@ -59,13 +64,14 @@ public class FcmService {
         MulticastMessage message = MulticastMessage.builder()
                 .putAllData(Map.of(
                         "type", "REQUEST_LOCATION",
-                        "requesterFcmToken", requesterFcmToken // (Wichtig, damit die Antwort zugestellt werden kann)
+                        "requesterFcmToken", requesterFcmToken
                 ))
                 .addAllTokens(friendTokens)
                 .build();
 
         try {
-            BatchResponse response = FirebaseMessaging.getInstance().sendMulticast(message);
+            // Auch hier: Umstieg auf sendEachForMulticast
+            BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
             logger.info("Standortanfrage an {} Geräte gesendet.", response.getSuccessCount());
         } catch (FirebaseMessagingException e) {
             logger.error("Fehler beim Senden der Standortanfrage", e);
@@ -73,14 +79,11 @@ public class FcmService {
     }
 
     /**
-     * NEU: Sendet die Standort-Antwort eines Freundes (B) zurück an den Anfrager (A).
-     * @param targetToken Das Token des Anfragers (User A)
-     * @param friend Der User, der seinen Standort meldet (User B)
-     * @param latitude Latiude von User B
-     * @param longitude Longitude von User B
+     * Sendet die Standort-Antwort eines Freundes (B) zurück an den Anfrager (A).
      */
     @Async
     public void sendLocationRefreshResponse(String targetToken, User friend, double latitude, double longitude) {
+        // Hier wird bereits message.setToken() und send() verwendet -> Das ist bereits HTTP v1 kompatibel!
         Message message = Message.builder()
                 .putAllData(Map.of(
                         "type", "FRIEND_LOCATION_UPDATE",
@@ -100,18 +103,12 @@ public class FcmService {
         }
     }
 
-
     /**
-     * Sends a "ping" notification to a specific target user using Firebase Cloud Messaging (FCM).
-     *
-     * @param targetToken The FCM token of the target user who will receive the ping notification.
-     * @param sender The user who is sending the ping notification.
-     * @param senderProfileUrl The URL of the sender's profile image, if available.
+     * Sends a "ping" notification to a specific target user.
      */
     public void sendPingNotification(String targetToken, User sender, String senderProfileUrl) {
         if (targetToken == null || targetToken.isEmpty()) return;
 
-        // Baue die Map für die Daten, null-safe
         Map<String, String> data = new java.util.HashMap<>();
         data.put("type", "FRIEND_PING");
         data.put("senderId", sender.getId().toString());
@@ -122,13 +119,15 @@ public class FcmService {
             data.put("senderProfileImageUrl", senderProfileUrl);
         }
 
-        MulticastMessage message = MulticastMessage.builder()
-                .addToken(targetToken)
+        // OPTIMIERUNG: Da es nur EIN Token ist, nutzen wir Message statt MulticastMessage.
+        // Das ist effizienter und nutzt direkt die Einzel-API.
+        Message message = Message.builder()
+                .setToken(targetToken) // setToken statt addToken
                 .putAllData(data)
                 .build();
 
         try {
-            FirebaseMessaging.getInstance().sendMulticast(message);
+            FirebaseMessaging.getInstance().send(message); // send() statt sendMulticast()
             logger.info("Sent PING from {} to token ending in ...{}", sender.getUsername(), targetToken.substring(Math.max(0, targetToken.length() - 6)));
         } catch (FirebaseMessagingException e) {
             logger.error("Error sending Ping FCM", e);
