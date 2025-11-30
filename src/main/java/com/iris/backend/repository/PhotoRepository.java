@@ -93,6 +93,7 @@ ORDER BY ph.uploaded_at DESC
 
     /**
      * 3. FÜR "PICTURES FROM OTHERS" (Custom Place):
+     * KORRIGIERT: Benannte Parameter statt ?1, ?2
      */
     @Query(value = """
         WITH historical_points AS (
@@ -101,7 +102,7 @@ ORDER BY ph.uploaded_at DESC
                 (h ->> 'longitude')::float AS longitude,
                 (h ->> 'timestamp')::timestamptz AS "timestamp"
             FROM
-                jsonb_array_elements(?2::jsonb) AS h
+                jsonb_array_elements(CAST(:historyJson AS jsonb)) AS h
         )
         SELECT DISTINCT ph.*
         FROM
@@ -115,16 +116,21 @@ ORDER BY ph.uploaded_at DESC
                 cp.radius_meters
             )
         WHERE
-            ph.custom_place_id = ?1
+            ph.custom_place_id = :customPlaceId
             AND (ph.visibility = 'PUBLIC' OR ph.visibility = 'VISIBLE_TO_ALL')
-            AND ph.uploader_id != ?3 -- WICHTIG: Eigene ausschließen
+            AND ph.uploader_id != :excludeUserId
             AND ph.uploaded_at BETWEEN (h."timestamp" - interval '5 hours') AND h."timestamp"
         ORDER BY ph.uploaded_at DESC
     """, nativeQuery = true)
-    List<Photo> findPhotosForCustomPlaceMatchingHistoricalBatchFromOthers(UUID customPlaceId, String historyJson, UUID excludeUserId);
+    List<Photo> findPhotosForCustomPlaceMatchingHistoricalBatchFromOthers(
+            @Param("customPlaceId") UUID customPlaceId,
+            @Param("historyJson") String historyJson,
+            @Param("excludeUserId") UUID excludeUserId
+    );
 
     /**
      * 4. FÜR "YOUR SHARED PHOTOS" (Custom Place):
+     * KORRIGIERT: Benannte Parameter statt ?1, ?2
      */
     @Query(value = """
         WITH historical_points AS (
@@ -133,7 +139,7 @@ ORDER BY ph.uploaded_at DESC
                 (h ->> 'longitude')::float AS longitude,
                 (h ->> 'timestamp')::timestamptz AS "timestamp"
             FROM
-                jsonb_array_elements(?2::jsonb) AS h
+                jsonb_array_elements(CAST(:historyJson AS jsonb)) AS h
         )
         SELECT DISTINCT ph.*
         FROM
@@ -147,12 +153,16 @@ ORDER BY ph.uploaded_at DESC
                 cp.radius_meters
             )
         WHERE
-            ph.custom_place_id = ?1
-            AND ph.uploader_id = ?3 -- WICHTIG: Nur meine Fotos
+            ph.custom_place_id = :customPlaceId
+            AND ph.uploader_id = :targetUserId
             AND ph.uploaded_at BETWEEN (h."timestamp" - interval '5 hours') AND h."timestamp"
         ORDER BY ph.uploaded_at DESC
     """, nativeQuery = true)
-    List<Photo> findPhotosForCustomPlaceMatchingHistoricalBatchFromUser(UUID customPlaceId, String historyJson, UUID targetUserId);
+    List<Photo> findPhotosForCustomPlaceMatchingHistoricalBatchFromUser(
+            @Param("customPlaceId") UUID customPlaceId,
+            @Param("historyJson") String historyJson,
+            @Param("targetUserId") UUID targetUserId
+    );
 
 
     // --- Bestehende Methoden (unverändert lassen, falls woanders benötigt) ---
