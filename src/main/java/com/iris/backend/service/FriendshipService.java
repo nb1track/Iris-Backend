@@ -263,20 +263,24 @@ public class FriendshipService {
      * Wird von einem Freund (B) aufgerufen, um seinen Standort an den Anfrager (A) zu senden.
      */
     public void reportLocationToRequester(User friend, LocationReportDTO report) {
-        // Der 'friend' (User B) wird aus dem @AuthenticationPrincipal geholt.
-        // Das 'report' (enthält User A's Token) kommt aus dem Request Body.
+        // 1. URL generieren
+        String signedProfileUrl = null;
+        if (friend.getProfileImageUrl() != null && !friend.getProfileImageUrl().isBlank()) {
+            signedProfileUrl = gcsStorageService.generateSignedUrl(
+                    profileImagesBucketName,
+                    friend.getProfileImageUrl(),
+                    15,
+                    TimeUnit.MINUTES
+            );
+        }
 
-        // 1. (Optional) Aktualisiere den Standort von User B in der DB (gute Synergie)
-        // Wir können dies hier tun, anstatt auf den 5-Minuten-Poll zu warten.
-        // HINWEIS: Dies erfordert, dass die Methode @Transactional ist.
-        // (Für die erste Implementierung lassen wir es einfach und fokussieren uns auf FCM)
-
-        // 2. Sende die Antwort-Push an User A
+        // 2. Mit URL aufrufen
         fcmService.sendLocationRefreshResponse(
                 report.targetFcmToken(),
                 friend,
                 report.latitude(),
-                report.longitude()
+                report.longitude(),
+                signedProfileUrl
         );
     }
 

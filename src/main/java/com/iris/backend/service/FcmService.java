@@ -78,20 +78,22 @@ public class FcmService {
         }
     }
 
-    /**
-     * Sendet die Standort-Antwort eines Freundes (B) zurück an den Anfrager (A).
-     */
     @Async
-    public void sendLocationRefreshResponse(String targetToken, User friend, double latitude, double longitude) {
-        // Hier wird bereits message.setToken() und send() verwendet -> Das ist bereits HTTP v1 kompatibel!
+    public void sendLocationRefreshResponse(String targetToken, User friend, double latitude, double longitude, String profileImageUrl) {
+        Map<String, String> data = new java.util.HashMap<>();
+        data.put("type", "FRIEND_LOCATION_UPDATE");
+        data.put("friendId", friend.getId().toString());
+        data.put("friendUsername", friend.getUsername());
+        data.put("latitude", String.valueOf(latitude));
+        data.put("longitude", String.valueOf(longitude));
+
+        // NEU: Bild mitsenden
+        if (profileImageUrl != null) {
+            data.put("friendProfileImageUrl", profileImageUrl);
+        }
+
         Message message = Message.builder()
-                .putAllData(Map.of(
-                        "type", "FRIEND_LOCATION_UPDATE",
-                        "friendId", friend.getId().toString(),
-                        "friendUsername", friend.getUsername(),
-                        "latitude", String.valueOf(latitude),
-                        "longitude", String.valueOf(longitude)
-                ))
+                .putAllData(data)
                 .setToken(targetToken)
                 .build();
 
