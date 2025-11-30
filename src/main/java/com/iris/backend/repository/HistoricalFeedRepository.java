@@ -163,7 +163,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
         String getAccessType();
         boolean getIsTrending();
         boolean getIsLive();
-        OffsetDateTime getExpiresAt();
+        java.time.Instant getExpiresAt();
 
         // Standard-Methode, um die Projektion einfach in das echte DTO umzuwandeln
         default GalleryFeedItemDTO toDTO() {

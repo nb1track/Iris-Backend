@@ -69,6 +69,11 @@ public class HistoricalFeedService {
                             // Wandle den Instant in ein OffsetDateTime (mit UTC als Offset)
                             newestPhotoTs = projection.getNewestPhotoTimestamp().atOffset(ZoneOffset.UTC);
                         }
+
+                        OffsetDateTime expiresAt = null;
+                        if (projection.getExpiresAt() != null) {
+                            expiresAt = projection.getExpiresAt().atOffset(ZoneOffset.UTC);
+                        }
                         // Erstelle das finale DTO
                         return new GalleryFeedItemDTO(
                                 projection.getPlaceType(),
@@ -85,7 +90,7 @@ public class HistoricalFeedService {
                                 projection.getAccessType(),
                                 projection.getIsTrending(),
                                 projection.getIsLive(),
-                                projection.getExpiresAt()
+                                expiresAt
                         );
                     })
                     .collect(Collectors.toList());
