@@ -1,6 +1,7 @@
 package com.iris.backend.controller;
 
 import com.iris.backend.dto.HistoricalSearchRequestDTO;
+import com.iris.backend.dto.ParticipantDTO;
 import com.iris.backend.dto.PhotoResponseDTO;
 import com.iris.backend.dto.feed.GalleryFeedItemDTO;
 import com.iris.backend.model.User;
@@ -69,6 +70,19 @@ public class PlaceController {
                 currentUser
         );
         return ResponseEntity.ok(photos);
+    }
+
+    /**
+     * NEU: Holt die Participants für einen Google Place.
+     * Logik analog zu Custom Places, aber ohne Owner-Check (da öffentlich).
+     */
+    @GetMapping("/google-places/{placeId}/participants")
+    public ResponseEntity<List<ParticipantDTO>> getParticipantsForGooglePlace(
+            @PathVariable Long placeId,
+            @AuthenticationPrincipal User currentUser) {
+
+        List<ParticipantDTO> participants = googleApiService.getParticipants(placeId, currentUser);
+        return ResponseEntity.ok(participants);
     }
 
 

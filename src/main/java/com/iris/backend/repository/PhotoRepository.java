@@ -164,8 +164,6 @@ ORDER BY ph.uploaded_at DESC
             @Param("targetUserId") UUID targetUserId
     );
 
-
-    // --- Bestehende Methoden (unverändert lassen, falls woanders benötigt) ---
     /**
      * Findet alle Fotos für den Freunde-Feed.
      * Das beinhaltet Fotos mit Visibility 'FRIENDS' UND 'VISIBLE_TO_ALL' (Hybrid).
@@ -179,6 +177,8 @@ ORDER BY ph.uploaded_at DESC
     @Query("SELECT DISTINCT p.uploader FROM Photo p WHERE p.customPlace = :customPlace")
     List<User> findDistinctUploadersByCustomPlace(CustomPlace customPlace);
 
+    @Query("SELECT DISTINCT p.uploader FROM Photo p WHERE p.googlePlace.id = :googlePlaceId")
+    List<User> findDistinctUploadersByGooglePlaceId(@Param("googlePlaceId") Long googlePlaceId);
     Optional<Photo> findFirstByGooglePlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(Long googlePlaceId, PhotoVisibility visibility, OffsetDateTime now);
     long countByGooglePlaceIdAndVisibilityAndExpiresAtAfter(Long googlePlaceId, PhotoVisibility visibility, OffsetDateTime now);
     Optional<Photo> findFirstByCustomPlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(UUID customPlaceId, PhotoVisibility visibility, OffsetDateTime now);
