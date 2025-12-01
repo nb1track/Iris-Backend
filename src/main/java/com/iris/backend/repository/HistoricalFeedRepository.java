@@ -1,7 +1,7 @@
 package com.iris.backend.repository;
 
 import com.iris.backend.dto.feed.GalleryFeedItemDTO;
-import com.iris.backend.dto.feed.GalleryPlaceType; // Importiere dein Enum
+import com.iris.backend.dto.feed.GalleryPlaceType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,15 +11,12 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-// Wir nutzen Photo als "Basis-Repository", da JpaRepository ein Entity braucht,
-// aber die Magie passiert in der @Query.
 @Repository
 public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend.model.Photo, UUID> {
 
     /**
      * Dies ist die neue, vereinheitlichte native Query für den Historical Feed.
-     * Sie nutzt UNION ALL, um GooglePlaces und CustomPlaces zu kombinieren
-     * und gibt direkt die Spalten zurück, die wir für GalleryFeedItemDTO brauchen.
+     * UPDATE: Priorisiert jetzt das `cover_image_url` aus `custom_places`, falls vorhanden.
      */
     @Query(value = """
         WITH historical_points AS (
@@ -47,13 +44,14 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 NULL::text AS access_type,
                 FALSE AS is_trending,
                 TRUE AS is_live,
-                NULL::timestamptz AS expires_at
+                NULL::timestamptz AS expires_at,
+                NULL::text AS custom_cover_image -- Google Places haben kein Custom Cover
             FROM photos p
             JOIN google_places gp ON p.google_place_id = gp.id
             JOIN historical_points h ON ST_DWithin(
                 gp.location,
                 ST_MakePoint(h.longitude, h.latitude)::geography,
-                gp.radius_meters -- Nutzt den individuellen Radius des POI
+                gp.radius_meters
             )
             WHERE (p.visibility = 'PUBLIC' OR p.visibility = 'VISIBLE_TO_ALL')
               AND p.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
@@ -75,13 +73,14 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 cp.access_type,
                 cp.is_trending,
                 cp.is_live,
-                cp.expires_at
+                cp.expires_at,
+                cp.cover_image_url AS custom_cover_image -- Hole das Cover-Bild aus dem Custom Place
             FROM photos p
             JOIN custom_places cp ON p.custom_place_id = cp.id
             JOIN historical_points h ON ST_DWithin(
                 cp.location,
                 ST_MakePoint(h.longitude, h.latitude)::geography,
-                cp.radius_meters -- Nutzt den individuellen Radius des Spots
+                cp.radius_meters
             )
             WHERE (p.visibility = 'PUBLIC' OR p.visibility = 'VISIBLE_TO_ALL')
               AND p.uploaded_at BETWEEN (h.timestamp - interval '5 hours') AND h.timestamp
@@ -108,24 +107,24 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 is_trending,
                 is_live,
                 expires_at,
+                custom_cover_image, -- Müssen wir mitgruppieren
                 COUNT(photo_id) AS photo_count,
-                -- Finde die URL des neusten Fotos
-                (ARRAY_AGG(storage_url ORDER BY uploaded_at DESC))[1] AS cover_image_url,
+                -- Finde die URL des neusten USER-Fotos als Fallback
+                (ARRAY_AGG(storage_url ORDER BY uploaded_at DESC))[1] AS latest_user_photo,
                 MAX(uploaded_at) AS newest_photo_timestamp
             FROM all_photos
-            GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+            GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
         )
         
         -- 5. Finale Selektion als Interface-Projektion
-        -- Spring Data wird diese Spalten automatisch auf das GalleryFeedItemDTO mappen
         SELECT
             place_type AS placeType,
             name,
             latitude,
             longitude,
-            cover_image_url AS coverImageUrl,
+            -- HIER IST DIE ÄNDERUNG: Priorisiere das Custom Cover Image
+            COALESCE(custom_cover_image, latest_user_photo) AS coverImageUrl,
             photo_count AS photoCount,
-            -- HIER IST DIE KORREKTUR: Expliziter Cast zu timestamptz
             newest_photo_timestamp::timestamptz AS newestPhotoTimestamp,
             CASE WHEN place_type = 'GOOGLE_POI' THEN place_id::bigint ELSE NULL END AS googlePlaceId,
             CASE WHEN place_type = 'IRIS_SPOT' THEN place_id::uuid ELSE NULL END AS customPlaceId,
@@ -142,12 +141,6 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
             @Param("historyJson") String historyJson
     );
 
-    /**
-     * Interface-Projektion, damit Spring Data die nativen Query-Ergebnisse
-     * direkt auf unser GalleryFeedItemDTO mappen kann.
-     * Die Methodennamen (get...) MÜSSEN exakt den Spalten-Aliassen (AS ...)
-     * aus der SQL-Query entsprechen.
-     */
     interface GalleryFeedItemDTOProjection {
         GalleryPlaceType getPlaceType();
         String getName();
@@ -165,7 +158,6 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
         boolean getIsLive();
         java.time.Instant getExpiresAt();
 
-        // Standard-Methode, um die Projektion einfach in das echte DTO umzuwandeln
         default GalleryFeedItemDTO toDTO() {
             return null;
         }
