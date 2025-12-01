@@ -52,27 +52,41 @@ public class FcmService {
     }
 
     /**
-     * Sendet eine "Bitte-sende-mir-deinen-Standort"-Anfrage an eine Liste von Freunden.
+     * Sendet eine "Bitte-sende-mir-deinen-Standort"-Anfrage mit HOHER PRIORITÄT.
      */
     @Async
     public void sendLocationRefreshRequest(List<String> friendTokens, String requesterFcmToken) {
         if (friendTokens.isEmpty() || requesterFcmToken == null || requesterFcmToken.isBlank()) {
-            logger.warn("sendLocationRefreshRequest abgebrochen: Keine Tokens oder kein Anfrager-Token.");
             return;
         }
+
+        // 1. Android Konfiguration: Hohe Priorität, um Doze Mode zu durchbrechen
+        AndroidConfig androidConfig = AndroidConfig.builder()
+                .setPriority(AndroidConfig.Priority.HIGH)
+                .setTtl(0) // 0 = Sofort zustellen oder gar nicht (verhindert alte Pushes)
+                .build();
+
+        // 2. iOS (APNs) Konfiguration: content-available = 1 weckt die App leise auf
+        ApnsConfig apnsConfig = ApnsConfig.builder()
+                .setAps(Aps.builder()
+                        .setContentAvailable(true) // WICHTIG für Silent Push auf iOS
+                        .build())
+                .putHeader("apns-priority", "10") // 10 = Sofort / High
+                .build();
 
         MulticastMessage message = MulticastMessage.builder()
                 .putAllData(Map.of(
                         "type", "REQUEST_LOCATION",
                         "requesterFcmToken", requesterFcmToken
                 ))
+                .setAndroidConfig(androidConfig) // Hinzufügen
+                .setApnsConfig(apnsConfig)       // Hinzufügen
                 .addAllTokens(friendTokens)
                 .build();
 
         try {
-            // Auch hier: Umstieg auf sendEachForMulticast
             BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
-            logger.info("Standortanfrage an {} Geräte gesendet.", response.getSuccessCount());
+            logger.info("Standortanfrage mit HOHEM PRIO an {} Geräte gesendet.", response.getSuccessCount());
         } catch (FirebaseMessagingException e) {
             logger.error("Fehler beim Senden der Standortanfrage", e);
         }
