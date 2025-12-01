@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.slf4j.Logger; // NEU
 import org.slf4j.LoggerFactory; // NEU
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 
 
@@ -180,5 +182,22 @@ public class UserController {
     public ResponseEntity<Boolean> checkAllowed(@RequestBody CheckAllowedRequestDTO request) {
         boolean isAllowed = userService.checkAllowed(request.phoneNumber());
         return ResponseEntity.ok(isAllowed);
+    }
+
+    /**
+     * Updates the user's profile image.
+     * Deletes the old image from storage and updates the database with the new filename.
+     */
+    @PostMapping(value = "/me/profile-image", consumes = {"multipart/form-data"})
+    public ResponseEntity<UserDTO> updateProfileImage(
+            @AuthenticationPrincipal User currentUser,
+            @RequestPart("file") MultipartFile file) {
+
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        UserDTO updatedUserProfile = userService.updateProfileImage(currentUser, file);
+        return ResponseEntity.ok(updatedUserProfile);
     }
 }

@@ -56,19 +56,42 @@ public class GcsStorageService {
      * Uploads a profile image to the profile images bucket.
      *
      * @param uid        The user's unique identifier, used as the file name.
-     * @param imageBytes The image data.
      * @return The object name of the uploaded file (e.g., "some-uid.jpg").
      */
+    public String uploadProfileImage(String uid, MultipartFile file) throws IOException {
+        // WICHTIG: Wir hängen eine UUID an, damit sich der Dateiname bei jedem Upload ändert.
+        // Das zwingt die App, das Bild neu zu laden.
+        String originalFilename = file.getOriginalFilename();
+        String extension = "jpg"; // Default
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf('.') + 1);
+        }
+
+        // Dateiname: UID + Zufallswert + Endung (z.B. "user123-a1b2c3d4.jpg")
+        String objectName = uid + "-" + UUID.randomUUID().toString() + "." + extension;
+
+        BlobId blobId = BlobId.of(profileImagesBucketName, objectName);
+        BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
+                .setContentType(file.getContentType()) // Nutzt den echten Content-Type (z.B. image/png)
+                .build();
+
+        storage.create(blobInfo, file.getBytes());
+        logger.info("Successfully uploaded profile image {} to bucket {}", objectName, profileImagesBucketName);
+        return objectName;
+    }
+
     public String uploadProfileImage(String uid, byte[] imageBytes) {
-        String objectName = uid + ".jpg";
+        // Auch hier hängen wir jetzt eine UUID an, um konsistent zu bleiben
+        String objectName = uid + "-" + UUID.randomUUID().toString() + ".jpg";
+
         BlobId blobId = BlobId.of(profileImagesBucketName, objectName);
         BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
                 .setContentType("image/jpeg")
                 .build();
 
         storage.create(blobInfo, imageBytes);
-        logger.info("Successfully uploaded profile image {} to bucket {}", objectName, profileImagesBucketName);
-        return objectName; // WICHTIG: Nur den Objektnamen zurückgeben
+        logger.info("Successfully uploaded profile image (byte[]) {} to bucket {}", objectName, profileImagesBucketName);
+        return objectName;
     }
 
     /**

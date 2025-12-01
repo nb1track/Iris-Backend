@@ -21,7 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Base64;
@@ -279,9 +281,9 @@ public class UserService {
     /**
      * Führt eine paginierte Suche nach Benutzern durch.
      *
-     * @param query Der Suchbegriff.
+     * @param query       Der Suchbegriff.
      * @param currentUser Der eingeloggte Benutzer, der die Suche durchführt.
-     * @param pageable Paginierungsinformationen.
+     * @param pageable    Paginierungsinformationen.
      * @return Eine Seite (Page) von UserDTOs.
      */
     @Transactional(readOnly = true)
@@ -309,5 +311,41 @@ public class UserService {
         // Wenn die Nummer existiert, ist sie blockiert -> return false (nicht allowed)
         // Wenn sie NICHT existiert -> return true (allowed)
         return !blockedNumberRepository.existsByPhoneNumber(phoneNumber);
+    }
+
+
+    /**
+     * Updates the profile image for a given user. Deletes the old profile image if it exists, uploads
+     * the new one to cloud storage, updates the user's profile image URL, and then saves the user
+     * entity with the updated profile image reference. Finally, it returns the updated user profile.
+     *
+     * @param user the user whose profile image is being updated
+     * @param file the new profile image as a multipart file
+     * @return the updated user profile as a UserDTO
+     * @throws RuntimeException if there is an error processing the profile image
+     */
+    @Transactional
+    public UserDTO updateProfileImage(User user, MultipartFile file) {
+        try {
+            // 1. Altes Bild löschen, falls vorhanden (Clean Code / Kostenersparnis)
+            String oldImageName = user.getProfileImageUrl();
+            if (oldImageName != null && !oldImageName.isBlank()) {
+                // Wir löschen das alte Bild aus dem Bucket
+                gcsStorageService.deleteFile(profileImagesBucketName, oldImageName);
+            }
+
+            // 2. Neues Bild hochladen (nutzt jetzt die neue Methode mit Unique-Name)
+            String newObjectName = gcsStorageService.uploadProfileImage(user.getFirebaseUid(), file);
+
+            // 3. User in der Datenbank aktualisieren
+            user.setProfileImageUrl(newObjectName);
+            User savedUser = userRepository.save(user);
+
+            // 4. Aktualisiertes Profil (als DTO) zurückgeben
+            return getUserProfile(savedUser);
+
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to upload new profile image: " + e.getMessage(), e);
+        }
     }
 }
