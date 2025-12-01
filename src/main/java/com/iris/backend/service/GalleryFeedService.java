@@ -215,49 +215,62 @@ public class GalleryFeedService {
 
     /**
      * Holt die aggregierten Foto-Infos (Anzahl, Cover-URL) für einen Ort.
+     * VERBESSERUNG: Zählt korrekt und ist robuster.
      */
     private AggregatedPhotoInfo getAggregatedPhotoInfo(Long googlePlaceId, UUID customPlaceId) {
-        Optional<Photo> coverPhotoOpt;
         long count;
         OffsetDateTime now = OffsetDateTime.now();
 
+        // 1. Hole ZUERST die Anzahl der aktiven, öffentlichen Fotos
         if (googlePlaceId != null) {
-            coverPhotoOpt = photoRepository.findFirstByGooglePlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(
+            count = photoRepository.countByGooglePlaceIdAndVisibilityAndExpiresAtAfter(
                     googlePlaceId, PhotoVisibility.PUBLIC, now
             );
-            count = photoRepository.countByGooglePlaceIdAndVisibilityAndExpiresAtAfter(
+        } else {
+            count = photoRepository.countByCustomPlaceIdAndVisibilityAndExpiresAtAfter(
+                    customPlaceId, PhotoVisibility.PUBLIC, now
+            );
+        }
+
+        // Wenn keine Fotos da sind, können wir direkt abbrechen
+        if (count == 0) {
+            return AggregatedPhotoInfo.EMPTY;
+        }
+
+        // 2. Wenn Fotos da sind (count > 0), versuchen wir das neueste für das Cover zu laden
+        Optional<Photo> coverPhotoOpt;
+        if (googlePlaceId != null) {
+            coverPhotoOpt = photoRepository.findFirstByGooglePlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(
                     googlePlaceId, PhotoVisibility.PUBLIC, now
             );
         } else {
             coverPhotoOpt = photoRepository.findFirstByCustomPlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(
                     customPlaceId, PhotoVisibility.PUBLIC, now
             );
-            count = photoRepository.countByCustomPlaceIdAndVisibilityAndExpiresAtAfter(
-                    customPlaceId, PhotoVisibility.PUBLIC, now
+        }
+
+        String signedUrl = null;
+        OffsetDateTime uploadedAt = null;
+
+        if (coverPhotoOpt.isPresent()) {
+            Photo coverPhoto = coverPhotoOpt.get();
+            uploadedAt = coverPhoto.getUploadedAt();
+
+            String objectName = coverPhoto.getStorageUrl();
+            if (coverPhoto.getStorageUrl().contains("/")) {
+                objectName = coverPhoto.getStorageUrl().substring(coverPhoto.getStorageUrl().lastIndexOf('/') + 1);
+            }
+
+            signedUrl = gcsStorageService.generateSignedUrl(
+                    photosBucketName,
+                    objectName,
+                    15,
+                    TimeUnit.MINUTES
             );
         }
 
-        if (coverPhotoOpt.isEmpty()) {
-            return AggregatedPhotoInfo.EMPTY;
-        }
-
-        Photo coverPhoto = coverPhotoOpt.get();
-
-        // Annahme: storageUrl ist nur der Objektname, nicht die volle URL
-        String objectName = coverPhoto.getStorageUrl();
-        if (coverPhoto.getStorageUrl().contains("/")) {
-            objectName = coverPhoto.getStorageUrl().substring(coverPhoto.getStorageUrl().lastIndexOf('/') + 1);
-        }
-
-        // !! HINWEIS: DIES WIRD FEHLSCHLAGEN, BIS WIR SCHRITT 2 MACHEN !!
-        String signedUrl = gcsStorageService.generateSignedUrl(
-                photosBucketName,
-                objectName,
-                15,
-                TimeUnit.MINUTES
-        );
-
-        return new AggregatedPhotoInfo(count, signedUrl, coverPhoto.getUploadedAt());
+        // Wir geben den 'count' zurück, auch wenn das Laden des Cover-Fotos fehlschlagen sollte (robuster)
+        return new AggregatedPhotoInfo(count, signedUrl, uploadedAt);
     }
 
     /**
