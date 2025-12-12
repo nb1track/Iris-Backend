@@ -42,7 +42,7 @@ public class GalleryFeedService {
     private final GcsStorageService gcsStorageService;
     private final GoogleApiService googleApiService;
 
-    @Value("${gcs.bucket.name}")
+    @Value("${gcs.bucket.photos.name}")
     private String photosBucketName;
 
     /**
