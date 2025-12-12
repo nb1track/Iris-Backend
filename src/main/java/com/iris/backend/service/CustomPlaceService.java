@@ -55,7 +55,7 @@ public class CustomPlaceService {
     public CustomPlace createCustomPlace(CreateCustomPlaceRequestDTO request, MultipartFile coverImage, User creator) throws IOException {
         // Sicherheits-Check, ob der User wirklich vor Ort ist.
         Point requestLocation = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
-        if (creator.getLastLocation() == null || creator.getLastLocation().distance(requestLocation) > 200) { // 200m Toleranz
+        if (creator.getLastLocation() == null || creator.getLastLocation().distance(requestLocation) > 200) {
             throw new IllegalStateException("User must be near the location to create a custom place.");
         }
 
@@ -87,7 +87,7 @@ public class CustomPlaceService {
     }
 
     @Transactional(readOnly = true)
-    public List<ParticipantDTO> getParticipants(UUID placeId, User currentUser) { // Rückgabetyp geändert
+    public List<ParticipantDTO> getParticipants(UUID placeId, User currentUser) {
         // 1. Finde den Custom Place
         CustomPlace place = customPlaceRepository.findById(placeId)
                 .orElseThrow(() -> new RuntimeException("Custom Place not found with ID: " + placeId));
