@@ -32,5 +32,7 @@ public record GalleryFeedItemDTO(
         String accessType, // z.B. "PUBLIC", "PASSWORD"
         Boolean isTrending,
         Boolean isLive,
-        OffsetDateTime expiresAt
+        OffsetDateTime expiresAt,
+
+        Long participantCount
 ) {}

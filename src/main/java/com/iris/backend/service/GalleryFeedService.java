@@ -8,6 +8,7 @@ import com.iris.backend.model.Photo;
 import com.iris.backend.model.User;
 import com.iris.backend.model.enums.PhotoVisibility;
 import com.iris.backend.repository.CustomPlaceRepository;
+import com.iris.backend.repository.ChallengeParticipantRepository;
 import com.iris.backend.repository.GooglePlaceRepository;
 import com.iris.backend.repository.PhotoRepository;
 import org.slf4j.Logger;
@@ -41,6 +42,7 @@ public class GalleryFeedService {
     private final PhotoRepository photoRepository;
     private final GcsStorageService gcsStorageService;
     private final GoogleApiService googleApiService;
+    private final ChallengeParticipantRepository challengeParticipantRepository;
 
     @Value("${gcs.bucket.photos.name}")
     private String photosBucketName;
@@ -60,12 +62,14 @@ public class GalleryFeedService {
                               GooglePlaceRepository googlePlaceRepository,
                               PhotoRepository photoRepository,
                               GcsStorageService gcsStorageService,
-                              GoogleApiService googleApiService) {
+                              GoogleApiService googleApiService,
+                              ChallengeParticipantRepository challengeParticipantRepository) {
         this.customPlaceRepository = customPlaceRepository;
         this.googlePlaceRepository = googlePlaceRepository;
         this.photoRepository = photoRepository;
         this.gcsStorageService = gcsStorageService;
         this.googleApiService = googleApiService;
+        this.challengeParticipantRepository = challengeParticipantRepository;
     }
 
 
@@ -158,7 +162,8 @@ public class GalleryFeedService {
                 null,
                 false,
                 true,
-                null
+                null,
+                0L
         );
     }
 
@@ -193,6 +198,7 @@ public class GalleryFeedService {
                 coverUrl = photoInfo.coverImageUrl();
             }
         }
+        long participantCount = challengeParticipantRepository.countParticipantsByCustomPlaceId(place.getId());
 
         return new GalleryFeedItemDTO(
                 GalleryPlaceType.IRIS_SPOT,
@@ -209,7 +215,8 @@ public class GalleryFeedService {
                 place.getAccessType().name(),
                 place.isTrending(),
                 place.isLive(),
-                place.getExpiresAt()
+                place.getExpiresAt(),
+                participantCount
         );
     }
 

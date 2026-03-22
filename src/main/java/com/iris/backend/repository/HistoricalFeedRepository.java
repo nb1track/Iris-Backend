@@ -157,7 +157,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
         boolean getIsTrending();
         boolean getIsLive();
         java.time.Instant getExpiresAt();
-
+        Long getParticipantCount();
         default GalleryFeedItemDTO toDTO() {
             return null;
         }

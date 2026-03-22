@@ -90,7 +90,8 @@ public class HistoricalFeedService {
                                 projection.getAccessType(),
                                 projection.getIsTrending(),
                                 projection.getIsLive(),
-                                expiresAt
+                                expiresAt,
+                                projection.getParticipantCount() != null ? projection.getParticipantCount() : 0L
                         );
                     })
                     .collect(Collectors.toList());
