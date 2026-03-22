@@ -145,7 +145,8 @@ public class GoogleApiService {
                 null, // accessType
                 false, // isTrending
                 true,  // isLive (Google POIs sind immer "live")
-                null   // expiresAt
+                null,  // expiresAt
+                0L
         );
     }
 

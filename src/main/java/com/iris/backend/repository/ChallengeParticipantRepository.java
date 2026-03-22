@@ -18,4 +18,7 @@ public interface ChallengeParticipantRepository extends JpaRepository<ChallengeP
 
     // Prüft, ob ein User bereits Teilnehmer ist
     boolean existsById(ChallengeParticipantId id);
+
+    @Query("SELECT COUNT(cp) FROM ChallengeParticipant cp WHERE cp.challenge.customPlace.id = :placeId")
+    long countParticipantsByCustomPlaceId(@Param("placeId") UUID placeId);
 }
