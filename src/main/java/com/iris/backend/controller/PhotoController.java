@@ -1,6 +1,8 @@
 package com.iris.backend.controller;
 
 import com.iris.backend.dto.PhotoResponseDTO;
+
+import java.io.IOException;
 import java.util.List;
 import com.iris.backend.dto.PhotoUploadRequestDTO;
 import com.iris.backend.dto.PhotoUploadResponse;
@@ -144,5 +146,30 @@ public class PhotoController {
             @AuthenticationPrincipal User currentUser) {
         photoLikeService.toggleLike(photoId, currentUser);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/batch-upload")
+    public ResponseEntity<List<PhotoUploadResponse>> uploadPhotos(
+            @RequestParam("files") MultipartFile[] files,
+            @RequestParam("metadata") String metadataJson,
+            @AuthenticationPrincipal User currentUser) {
+
+        try {
+            // Wir gehen davon aus, dass metadataJson ein Array von PhotoUploadRequestDTO ist
+            List<PhotoUploadRequestDTO> requests = objectMapper.readValue(metadataJson,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, PhotoUploadRequestDTO.class));
+
+            if (files.length != requests.size()) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            List<PhotoUploadResponse> responses = photoService.uploadPhotos(files, requests, currentUser);
+            return ResponseEntity.status(HttpStatus.CREATED).body(responses);
+
+        } catch (JsonProcessingException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }

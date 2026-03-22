@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iris.backend.dto.HistoricalPointDTO;
 import com.iris.backend.dto.PhotoResponseDTO;
+import com.iris.backend.dto.PhotoUploadRequestDTO;
+import com.iris.backend.dto.PhotoUploadResponse;
 import com.iris.backend.dto.feed.GalleryPlaceType;
 import com.iris.backend.model.*;
 import com.iris.backend.model.enums.FriendshipStatus;
@@ -20,10 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -389,5 +388,45 @@ public class PhotoService {
                 signedProfileImageUrl,
                 currentLikeCount
         );
+    }
+
+    /**
+     * Uploads photos with associated metadata and returns a list of responses containing
+     * the IDs of the uploaded photos. Each photo is uploaded based on the information
+     * provided in the corresponding request DTO.
+     *
+     * @param files       an array of {@code MultipartFile} representing the photos to be uploaded.
+     * @param requests    a list of {@code PhotoUploadRequestDTO} containing metadata for each photo,
+     *                    such as location and visibility settings.
+     * @param currentUser the {@code User} who is uploading the photos.
+     * @return a list of {@code PhotoUploadResponse} containing the IDs of the successfully uploaded photos.
+     * @throws IOException if an error occurs during file processing.
+     */
+    @Transactional
+    public List<PhotoUploadResponse> uploadPhotos(MultipartFile[] files,
+                                                  List<PhotoUploadRequestDTO> requests,
+                                                  User currentUser) throws IOException {
+        List<PhotoUploadResponse> responses = new ArrayList<>();
+
+        for (int i = 0; i < files.length; i++) {
+            PhotoUploadRequestDTO dto = requests.get(i);
+
+            // Aufruf deiner bestehenden createPhoto-Methode
+            UUID photoId = this.createPhoto(
+                    files[i],
+                    dto.latitude(),
+                    dto.longitude(),
+                    dto.visibility(),
+                    dto.googlePlaceId(),
+                    dto.customPlaceId(),
+                    currentUser,
+                    dto.friendIds(), // Falls im DTO vorhanden
+                    dto.challengeId() // Falls im DTO vorhanden
+            );
+
+            responses.add(new PhotoUploadResponse(photoId));
+        }
+
+        return responses;
     }
 }
