@@ -13,6 +13,7 @@ import com.iris.backend.repository.PhotoRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy; // <-- WICHTIG: Neuer Import!
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,26 +40,27 @@ public class GalleryFeedService {
     private final GcsStorageService gcsStorageService;
     private final GoogleApiService googleApiService;
 
-    @Value("${gcs.bucket.photos.name}")
-    private String photosBucketName;
-
+    // NEU: Kein @Value mehr hier oben! Das Feld ist jetzt final.
+    private final String photosBucketName;
 
     public record AggregatedPhotoInfo(long count, String coverImageUrl, OffsetDateTime newestPhotoTimestamp) {
         public static final AggregatedPhotoInfo EMPTY = new AggregatedPhotoInfo(0, null, null);
     }
 
+    // NEU: Constructor Injection für ALLES
     public GalleryFeedService(CustomPlaceRepository customPlaceRepository,
                               GooglePlaceRepository googlePlaceRepository,
                               PhotoRepository photoRepository,
                               GcsStorageService gcsStorageService,
-                              GoogleApiService googleApiService) {
+                              @Lazy GoogleApiService googleApiService, // <-- Bricht versteckte Zyklen auf!
+                              @Value("${gcs.bucket.photos.name}") String photosBucketName) { // <-- Wert wird hier übergeben
         this.customPlaceRepository = customPlaceRepository;
         this.googlePlaceRepository = googlePlaceRepository;
         this.photoRepository = photoRepository;
         this.gcsStorageService = gcsStorageService;
         this.googleApiService = googleApiService;
+        this.photosBucketName = photosBucketName;
     }
-
 
     @Transactional(readOnly = false)
     public List<GalleryFeedItemDTO> getTaggablePlaces(double latitude, double longitude) {
