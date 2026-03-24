@@ -8,7 +8,6 @@ import com.iris.backend.model.Photo;
 import com.iris.backend.model.User;
 import com.iris.backend.model.enums.PhotoVisibility;
 import com.iris.backend.repository.CustomPlaceRepository;
-import com.iris.backend.repository.ChallengeParticipantRepository;
 import com.iris.backend.repository.GooglePlaceRepository;
 import com.iris.backend.repository.PhotoRepository;
 import org.slf4j.Logger;
@@ -28,9 +27,6 @@ import java.util.stream.Stream;
 
 /**
  * Neuer, zentraler Service zur Erstellung aller "Public Gallery" Feeds.
- * Dieser Service ist verantwortlich für die Umwandlung von Entities
- * (GooglePlace, CustomPlace) in das vereinheitlichte GalleryFeedItemDTO
- * und unterstützt alle Anwendungsfälle.
  */
 @Service
 @Transactional(readOnly = true)
@@ -42,19 +38,11 @@ public class GalleryFeedService {
     private final PhotoRepository photoRepository;
     private final GcsStorageService gcsStorageService;
     private final GoogleApiService googleApiService;
-    private final ChallengeParticipantRepository challengeParticipantRepository;
 
-    @Value("${gcs.bucket.photos.name}")
+    @Value("${gcs.bucket.name}")
     private String photosBucketName;
 
-    /**
-     * Interner Record zur Bündelung von Foto-Aggregationsergebnissen.
-     */
     public record AggregatedPhotoInfo(long count, String coverImageUrl, OffsetDateTime newestPhotoTimestamp) {
-        /**
-         * Statische Konstante für den schnellen "Taggable Places"-Feed,
-         * der keine Foto-Infos benötigt.
-         */
         public static final AggregatedPhotoInfo EMPTY = new AggregatedPhotoInfo(0, null, null);
     }
 
@@ -62,90 +50,62 @@ public class GalleryFeedService {
                               GooglePlaceRepository googlePlaceRepository,
                               PhotoRepository photoRepository,
                               GcsStorageService gcsStorageService,
-                              GoogleApiService googleApiService,
-                              ChallengeParticipantRepository challengeParticipantRepository) {
+                              GoogleApiService googleApiService) {
         this.customPlaceRepository = customPlaceRepository;
         this.googlePlaceRepository = googlePlaceRepository;
         this.photoRepository = photoRepository;
         this.gcsStorageService = gcsStorageService;
         this.googleApiService = googleApiService;
-        this.challengeParticipantRepository = challengeParticipantRepository;
     }
 
 
-    /**
-     * Holt alle Orte (Google POIs und Iris Spots) in der Nähe eines Benutzers,
-     * die zum Taggen eines Fotos verfügbar sind (deine "cameraPage").
-     *
-     * KORREKTUR: Diese Methode ruft jetzt den GoogleApiService, wenn
-     * keine lokalen Google Places gefunden werden.
-     */
     @Transactional(readOnly = false)
     public List<GalleryFeedItemDTO> getTaggablePlaces(double latitude, double longitude) {
-        // [1] Hole zuerst Custom Places (Iris Spots) aus der lokalen DB
         List<CustomPlace> customPlaces = customPlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
-
-        // [2] Versuche, Google Places aus der lokalen DB zu holen
         List<GooglePlace> localGooglePlaces = googlePlaceRepository.findActivePlacesForUserLocation(latitude, longitude);
-
         List<GalleryFeedItemDTO> googlePlaceDTOs;
 
         if (localGooglePlaces.isEmpty()) {
-            // [3a] Wenn keine lokalen Google Places gefunden, rufe die Google API auf
-            // Diese Methode (findNearbyPlaces) gibt jetzt List<GalleryFeedItemDTO> zurück
-            // und speichert die Ergebnisse bereits in der DB für zukünftige Suchen.
             logger.info("Keine lokalen Google Places gefunden. Rufe Google API für lat={}, lon={}", latitude, longitude);
             googlePlaceDTOs = googleApiService.findNearbyPlaces(latitude, longitude);
         } else {
-            // [3b] Wenn lokale Google Places gefunden wurden, konvertiere sie in DTOs
-            // (ohne Foto-Infos, da 'false')
             googlePlaceDTOs = localGooglePlaces.stream()
                     .map(place -> convertToFeedItem(place, false))
                     .collect(Collectors.toList());
         }
 
-        // [4] Kombiniere die DTOs der Custom Places und der Google Places
         Stream<GalleryFeedItemDTO> combinedStream = Stream.concat(
                 googlePlaceDTOs.stream(),
-                customPlaces.stream().map(place -> convertToFeedItem(place, false,false))  // false = KEINE Foto-Infos laden
+                customPlaces.stream().map(place -> convertToFeedItem(place, false,false))
         );
 
-        // [5] Sortiere die kombinierte Liste nach Namen und gib sie zurück
         return combinedStream
                 .sorted(Comparator.comparing(GalleryFeedItemDTO::name))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Holt alle "Trending" Iris Spots.
-     * (Implementiert die Logik für CustomPlaceController)
-     */
     public List<GalleryFeedItemDTO> getTrendingSpots() {
         return customPlaceRepository.findAllByIsTrendingTrueOrderByCreatedAtDesc()
                 .stream()
-                .map(place -> convertToFeedItem(place, true, false)) // true = Foto-Infos laden
-                .filter(item -> item.photoCount() > 0) // Annahme: Trending Spots sollen auch nur angezeigt werden, wenn sie Fotos haben
+                .map(place -> convertToFeedItem(place, true, false))
+                .filter(item -> item.photoCount() > 0)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Holt alle vom eingeloggten User erstellten Iris Spots.
-     * (Implementiert die Logik für CustomPlaceController)
-     */
     public List<GalleryFeedItemDTO> getMyCreatedSpots(User currentUser) {
         return customPlaceRepository.findAllByCreatorOrderByCreatedAtDesc(currentUser)
                 .stream()
-                .map(place -> convertToFeedItem(place, true, true)) // true = Foto-Infos laden
+                .map(place -> convertToFeedItem(place, true, true))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Private Helfermethode: Konvertiert ein GooglePlace-Entity in ein DTO.
-     */
     private GalleryFeedItemDTO convertToFeedItem(GooglePlace place, boolean loadPhotoInfo) {
         AggregatedPhotoInfo photoInfo = loadPhotoInfo
                 ? getAggregatedPhotoInfo(place.getId(), null, false)
                 : AggregatedPhotoInfo.EMPTY;
+
+        // NEU: Zähle Uploader für Google Place
+        long participantCount = photoRepository.countDistinctUploadersByGooglePlaceId(place.getId());
 
         return new GalleryFeedItemDTO(
                 GalleryPlaceType.GOOGLE_POI,
@@ -163,49 +123,43 @@ public class GalleryFeedService {
                 false,
                 true,
                 null,
-                0L
+                participantCount // Hier setzen wir jetzt den echten Wert statt 0L
         );
     }
 
-    /**
-     * Private Helfermethode: Konvertiert ein CustomPlace-Entity in ein DTO.
-     */
     private GalleryFeedItemDTO convertToFeedItem(CustomPlace place, boolean loadPhotoInfo, boolean isOwnerMode) {
         String coverUrl = null;
         long photoCount = 0;
         OffsetDateTime newestTimestamp = null;
 
-        // 1. Versuche zuerst das statische Cover-Image zu laden
         if (place.getCoverImageUrl() != null && !place.getCoverImageUrl().isBlank()) {
-            // Wir nutzen denselben Bucket, in den wir es hochgeladen haben (photosBucketName)
             coverUrl = gcsStorageService.generateSignedUrl(
                     photosBucketName,
                     place.getCoverImageUrl(),
-                    60, // Längere Gültigkeit für Feeds ist oft besser, z.B. 60 Min
+                    60,
                     TimeUnit.MINUTES
             );
         }
 
-        // 2. Lade Live-Foto-Infos (Anzahl der Uploads), falls gewünscht
         if (loadPhotoInfo) {
             AggregatedPhotoInfo photoInfo = getAggregatedPhotoInfo(null, place.getId(), isOwnerMode);
             photoCount = photoInfo.count();
             newestTimestamp = photoInfo.newestPhotoTimestamp();
 
-            // FALLBACK: Wenn kein statisches Cover gesetzt wurde (für alte Spots),
-            // nimm das neueste Foto aus dem Feed.
             if (coverUrl == null) {
                 coverUrl = photoInfo.coverImageUrl();
             }
         }
-        long participantCount = challengeParticipantRepository.countParticipantsByCustomPlaceId(place.getId());
+
+        // NEU: Zähle Uploader für Custom Place (Nutzt die PhotoRepository Methode)
+        long participantCount = photoRepository.countDistinctUploadersByCustomPlaceId(place.getId());
 
         return new GalleryFeedItemDTO(
                 GalleryPlaceType.IRIS_SPOT,
                 place.getName(),
                 place.getLocation().getY(),
                 place.getLocation().getX(),
-                coverUrl, // Hier ist jetzt entweder das statische oder das dynamische Bild
+                coverUrl,
                 photoCount,
                 newestTimestamp,
                 null,
@@ -220,10 +174,6 @@ public class GalleryFeedService {
         );
     }
 
-    /**
-     * Holt die aggregierten Foto-Infos (Anzahl, Cover-URL) für einen Ort.
-     * VERBESSERUNG: Zählt korrekt und ist robuster.
-     */
     private AggregatedPhotoInfo getAggregatedPhotoInfo(Long googlePlaceId, UUID customPlaceId, boolean includePrivate) {
         long count;
         OffsetDateTime now = OffsetDateTime.now();
@@ -233,13 +183,9 @@ public class GalleryFeedService {
                     googlePlaceId, PhotoVisibility.PUBLIC, now
             );
         } else {
-            // Custom Places Logik
             if (includePrivate) {
-                // WICHTIG: Zähle ALLES (Public + Friends) wenn Owner.
-                // ACHTUNG: Stelle sicher, dass diese Methode im PhotoRepository existiert!
                 count = photoRepository.countByCustomPlaceIdAndExpiresAtAfter(customPlaceId, now);
             } else {
-                // Zähle nur PUBLIC wenn nicht Owner
                 count = photoRepository.countByCustomPlaceIdAndVisibilityAndExpiresAtAfter(
                         customPlaceId, PhotoVisibility.PUBLIC, now
                 );
@@ -275,29 +221,11 @@ public class GalleryFeedService {
         return new AggregatedPhotoInfo(count, signedUrl, uploadedAt);
     }
 
-    /**
-     * NEU: Öffentliche Methode, um ein einzelnes CustomPlace-Entity
-     * in ein GalleryFeedItemDTO umzuwandeln.
-     * Nützlich nach dem Erstellen/Aktualisieren eines Spots.
-     *
-     * @param place Das entity, das konvertiert werden soll.
-     * @param loadPhotoInfo 'true', wenn Foto-Infos geladen werden sollen.
-     * @return Das konvertierte GalleryFeedItemDTO.
-     */
     public GalleryFeedItemDTO getFeedItemForPlace(CustomPlace place, boolean loadPhotoInfo) {
         return convertToFeedItem(place, loadPhotoInfo, true);
     }
 
-    /**
-     * NEU: Öffentliche Methode, um ein einzelnes GooglePlace-Entity
-     * in ein GalleryFeedItemDTO umzuwandeln.
-     *
-     * @param place Das entity, das konvertiert werden soll.
-     * @param loadPhotoInfo 'true', wenn Foto-Infos geladen werden sollen.
-     * @return Das konvertierte GalleryFeedItemDTO.
-     */
     public GalleryFeedItemDTO getFeedItemForPlace(GooglePlace place, boolean loadPhotoInfo) {
-        // Ruft die private Helfermethode auf
         return convertToFeedItem(place, loadPhotoInfo);
     }
 }

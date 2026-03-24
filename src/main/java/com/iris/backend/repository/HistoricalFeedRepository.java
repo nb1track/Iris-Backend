@@ -7,20 +7,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend.model.Photo, UUID> {
 
-    /**
-     * Dies ist die neue, vereinheitlichte native Query für den Historical Feed.
-     * UPDATE: Priorisiert jetzt das `cover_image_url` aus `custom_places`, falls vorhanden.
-     */
     @Query(value = """
         WITH historical_points AS (
-            -- Wandelt den JSON-Input in eine Tabelle um
             SELECT
                 (value ->> 'latitude')::float AS latitude,
                 (value ->> 'longitude')::float AS longitude,
@@ -45,7 +39,11 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 FALSE AS is_trending,
                 TRUE AS is_live,
                 NULL::timestamptz AS expires_at,
-                NULL::text AS custom_cover_image -- Google Places haben kein Custom Cover
+                NULL::text AS custom_cover_image,
+                -- NEU: Zählt die einzigartigen Uploader für diesen Google Place
+                (SELECT COUNT(DISTINCT ph_sub.uploader_id) 
+                 FROM photos ph_sub 
+                 WHERE ph_sub.google_place_id = gp.id)::bigint AS participant_count
             FROM photos p
             JOIN google_places gp ON p.google_place_id = gp.id
             JOIN historical_points h ON ST_DWithin(
@@ -74,7 +72,11 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 cp.is_trending,
                 cp.is_live,
                 cp.expires_at,
-                cp.cover_image_url AS custom_cover_image -- Hole das Cover-Bild aus dem Custom Place
+                cp.cover_image_url AS custom_cover_image,
+                -- NEU: Zählt die einzigartigen Uploader für diesen Custom Place
+                (SELECT COUNT(DISTINCT ph_sub.uploader_id) 
+                 FROM photos ph_sub 
+                 WHERE ph_sub.custom_place_id = cp.id)::bigint AS participant_count
             FROM photos p
             JOIN custom_places cp ON p.custom_place_id = cp.id
             JOIN historical_points h ON ST_DWithin(
@@ -93,7 +95,7 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
             SELECT * FROM custom_photos
         ),
         
-        -- 4. Gruppiere die Fotos nach Ort und hole die Cover-Infos
+        -- 4. Gruppiere die Fotos nach Ort
         grouped_places AS (
             SELECT
                 place_id,
@@ -107,22 +109,21 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 is_trending,
                 is_live,
                 expires_at,
-                custom_cover_image, -- Müssen wir mitgruppieren
+                custom_cover_image,
+                MAX(participant_count) AS participant_count,
                 COUNT(photo_id) AS photo_count,
-                -- Finde die URL des neusten USER-Fotos als Fallback
                 (ARRAY_AGG(storage_url ORDER BY uploaded_at DESC))[1] AS latest_user_photo,
                 MAX(uploaded_at) AS newest_photo_timestamp
             FROM all_photos
             GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
         )
         
-        -- 5. Finale Selektion als Interface-Projektion
+        -- 5. Finale Selektion
         SELECT
             place_type AS placeType,
             name,
             latitude,
             longitude,
-            -- HIER IST DIE ÄNDERUNG: Priorisiere das Custom Cover Image
             COALESCE(custom_cover_image, latest_user_photo) AS coverImageUrl,
             photo_count AS photoCount,
             newest_photo_timestamp::timestamptz AS newestPhotoTimestamp,
@@ -133,7 +134,8 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
             access_type AS accessType,
             is_trending AS isTrending,
             is_live AS isLive,
-            expires_at::timestamptz AS expiresAt
+            expires_at::timestamptz AS expiresAt,
+            participant_count AS participantCount
         FROM grouped_places
         ORDER BY newest_photo_timestamp DESC
     """, nativeQuery = true)
@@ -158,8 +160,5 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
         boolean getIsLive();
         java.time.Instant getExpiresAt();
         Long getParticipantCount();
-        default GalleryFeedItemDTO toDTO() {
-            return null;
-        }
     }
 }
