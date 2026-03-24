@@ -39,7 +39,7 @@ public class GalleryFeedService {
     private final GcsStorageService gcsStorageService;
     private final GoogleApiService googleApiService;
 
-    @Value("${gcs.bucket.name}")
+    @Value("${gcs.bucket.photos.name}")
     private String photosBucketName;
 
     public record AggregatedPhotoInfo(long count, String coverImageUrl, OffsetDateTime newestPhotoTimestamp) {
