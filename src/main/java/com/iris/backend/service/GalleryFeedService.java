@@ -42,6 +42,7 @@ public class GalleryFeedService {
     @Value("${gcs.bucket.photos.name}")
     private String photosBucketName;
 
+
     public record AggregatedPhotoInfo(long count, String coverImageUrl, OffsetDateTime newestPhotoTimestamp) {
         public static final AggregatedPhotoInfo EMPTY = new AggregatedPhotoInfo(0, null, null);
     }
