@@ -2,6 +2,7 @@ package com.iris.backend.service;
 
 import com.iris.backend.dto.CreateCustomPlaceRequestDTO;
 import com.iris.backend.dto.ParticipantDTO;
+import com.iris.backend.dto.UpdateCustomPlaceRequestDTO;
 import com.iris.backend.dto.UserDTO;
 import com.iris.backend.model.CustomPlace;
 import com.iris.backend.model.Friendship;
@@ -134,5 +135,49 @@ public class CustomPlaceService {
                     return new ParticipantDTO(user.getId(), user.getUsername(), signedProfileUrl, isFriend);
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public CustomPlace updateCustomPlace(UUID placeId, UpdateCustomPlaceRequestDTO request, MultipartFile coverImage, User currentUser) throws IOException {
+        // 1. Hole den bestehenden Spot aus der Datenbank
+        CustomPlace place = customPlaceRepository.findById(placeId)
+                .orElseThrow(() -> new RuntimeException("Custom Place nicht gefunden: " + placeId));
+
+        // 2. Sicherheits-Check: Ist der aktuelle User auch der Ersteller?
+        if (!place.getCreator().getId().equals(currentUser.getId())) {
+            throw new SecurityException("Nur der Ersteller darf diesen Spot bearbeiten.");
+        }
+
+        // 3. Felder aktualisieren (nur wenn sie im DTO nicht null sind)
+        if (request.name() != null) place.setName(request.name());
+        if (request.radiusMeters() != null) place.setRadiusMeters(request.radiusMeters());
+        if (request.accessType() != null) place.setAccessType(request.accessType());
+        if (request.accessKey() != null) place.setAccessKey(request.accessKey());
+        if (request.isTrending() != null) place.setTrending(request.isTrending());
+        if (request.expiresAt() != null) place.setExpiresAt(request.expiresAt());
+        if (request.challengesActivated() != null) place.setChallengesActivated(request.challengesActivated());
+
+        // 4. Logik für Live-Status anpassen
+        if (request.isLive() != null || request.scheduledLiveAt() != null) {
+            boolean liveStatus = request.isLive() != null ? request.isLive() : place.isLive();
+            if (liveStatus) {
+                place.setLive(true);
+                place.setScheduledLiveAt(null);
+            } else {
+                place.setLive(false);
+                place.setScheduledLiveAt(request.scheduledLiveAt() != null ? request.scheduledLiveAt() : place.getScheduledLiveAt());
+            }
+        }
+
+        // 5. Cover-Bild aktualisieren (falls ein neues hochgeladen wurde)
+        if (coverImage != null && !coverImage.isEmpty()) {
+            // Optional: Hier könntest du das alte Bild aus GCS löschen, um Speicher zu sparen
+            // gcsStorageService.deletePhoto(place.getCoverImageUrl());
+
+            String newCoverImageName = gcsStorageService.uploadPhoto(coverImage);
+            place.setCoverImageUrl(newCoverImageName);
+        }
+
+        return customPlaceRepository.save(place);
     }
 }

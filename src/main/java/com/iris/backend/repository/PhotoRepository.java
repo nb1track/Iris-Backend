@@ -179,9 +179,12 @@ ORDER BY ph.uploaded_at DESC
 
     @Query("SELECT DISTINCT p.uploader FROM Photo p WHERE p.googlePlace.id = :googlePlaceId")
     List<User> findDistinctUploadersByGooglePlaceId(@Param("googlePlaceId") Long googlePlaceId);
-    @Query("SELECT COUNT(DISTINCT p.uploader.id) FROM Photo p WHERE p.customPlace.id = :customPlaceId")
+    // NEU: Zählt wie viele verschiedene Benutzer (unique) ein Foto an diesem Custom Spot hochgeladen haben
+    @Query("SELECT COUNT(DISTINCT p.uploader) FROM Photo p WHERE p.customPlace.id = :customPlaceId")
     long countDistinctUploadersByCustomPlaceId(@Param("customPlaceId") UUID customPlaceId);
-    @Query("SELECT COUNT(DISTINCT p.uploader.id) FROM Photo p WHERE p.googlePlace.id = :googlePlaceId")
+
+    // NEU: Zählt wie viele verschiedene Benutzer (unique) ein Foto an diesem Google Spot hochgeladen haben
+    @Query("SELECT COUNT(DISTINCT p.uploader) FROM Photo p WHERE p.googlePlace.id = :googlePlaceId")
     long countDistinctUploadersByGooglePlaceId(@Param("googlePlaceId") Long googlePlaceId);
     Optional<Photo> findFirstByGooglePlaceIdAndVisibilityAndExpiresAtAfterOrderByUploadedAtDesc(Long googlePlaceId, PhotoVisibility visibility, OffsetDateTime now);
     long countByGooglePlaceIdAndVisibilityAndExpiresAtAfter(Long googlePlaceId, PhotoVisibility visibility, OffsetDateTime now);

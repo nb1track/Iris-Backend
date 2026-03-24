@@ -152,4 +152,41 @@ public class CustomPlaceController {
         return ResponseEntity.ok(content);
     }
 
+    /**
+     * Aktualisiert einen bestehenden Custom Place (Iris Spot).
+     * Nur der Ersteller darf diese Aktion ausführen.
+     */
+    @PutMapping(value = "/{placeId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<GalleryFeedItemDTO> updateCustomPlace(
+            @PathVariable UUID placeId,
+            @RequestPart(value = "data", required = false) String dataJson,
+            @RequestPart(value = "image", required = false) MultipartFile coverImage,
+            @AuthenticationPrincipal User currentUser) throws JsonProcessingException {
+
+        UpdateCustomPlaceRequestDTO request = null;
+
+        // JSON nur parsen, wenn es auch mitgeschickt wurde
+        if (dataJson != null) {
+            request = objectMapper.readValue(dataJson, UpdateCustomPlaceRequestDTO.class);
+        } else {
+            // Wenn kein Text-Update, erstellen wir ein leeres DTO (alle Felder null)
+            request = new UpdateCustomPlaceRequestDTO(null, null, null, null, null, null, null, null, null);
+        }
+
+        try {
+            // 1. Aktualisiere den Spot im Service
+            CustomPlace updatedPlaceEntity = customPlaceService.updateCustomPlace(placeId, request, coverImage, currentUser);
+
+            // 2. Konvertiere das Entity zurück in ein GalleryFeedItemDTO (damit das Frontend direkt die neuen Daten hat)
+            GalleryFeedItemDTO updatedPlaceDTO = galleryFeedService.getFeedItemForPlace(updatedPlaceEntity, true);
+
+            return ResponseEntity.ok(updatedPlaceDTO);
+
+        } catch (SecurityException e) {
+            // 403 Forbidden, falls ein Fremder versucht den Spot zu bearbeiten
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (Exception e) {
+            throw new RuntimeException("Fehler beim Aktualisieren des Custom Places: " + e.getMessage());
+        }
+    }
 }

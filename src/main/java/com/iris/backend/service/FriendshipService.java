@@ -15,7 +15,7 @@ import com.iris.backend.repository.CustomPlaceRepository;
 import com.iris.backend.repository.FriendshipRepository;
 import com.iris.backend.repository.GooglePlaceRepository;
 import com.iris.backend.repository.UserRepository;
-import com.iris.backend.service.GalleryFeedService;
+import org.springframework.context.annotation.Lazy;
 import org.locationtech.jts.geom.Point;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +59,7 @@ public class FriendshipService {
                              FcmService fcmService,
                              GooglePlaceRepository googlePlaceRepository,
                              CustomPlaceRepository customPlaceRepository,
-                             GalleryFeedService galleryFeedService) {
+                             @Lazy GalleryFeedService galleryFeedService) {
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
         this.gcsStorageService = gcsStorageService;
