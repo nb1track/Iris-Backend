@@ -225,4 +225,18 @@ public class FriendshipController {
         friendshipService.pingFriend(currentUser, request.targetUserId());
         return ResponseEntity.ok().build();
     }
+
+    /**
+     * Holt die Liste der Freunde, PERFEKT SORTIERT nach dem Algorithmus
+     * (Bester Freund + Letzte Interaktion).
+     * Ideal für den "Senden an..." / "Zuletzt geteilt" Screen im Frontend.
+     * * Endpoint: GET /api/v1/friends/share-list
+     */
+    @GetMapping("/share-list")
+    public ResponseEntity<List<UserDTO>> getFriendsForShareScreen(
+            @AuthenticationPrincipal User currentUser) {
+
+        List<UserDTO> sortedFriends = friendshipService.getFriendsForShareScreen(currentUser.getId());
+        return ResponseEntity.ok(sortedFriends);
+    }
 }
