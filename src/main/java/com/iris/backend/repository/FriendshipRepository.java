@@ -27,6 +27,20 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
     // Diese Methode hattest du schon, um doppelte Anfragen zu verhindern
     boolean existsByUserOneAndUserTwo(User userOne, User userTwo);
 
-    @Query("SELECT f FROM Friendship f WHERE (f.userOne = :userA AND f.userTwo = :userB) OR (f.userOne = :userB AND f.userTwo = :userA)")
+    @Query("""
+        SELECT f FROM Friendship f 
+        WHERE (f.userOne = :user OR f.userTwo = :user) 
+          AND f.status = 'ACCEPTED' 
+        ORDER BY f.interactionScore DESC, f.lastInteractedAt DESC NULLS LAST, f.createdAt ASC
+    """)
+    List<Friendship> findFriendsSortedByInteraction(@Param("user") User user);
+
+    // Hilfsmethode, um die Freundschaft zwischen zwei spezifischen Usern zu finden (für das Update)
+    @Query("""
+        SELECT f FROM Friendship f 
+        WHERE ((f.userOne = :userA AND f.userTwo = :userB) 
+           OR (f.userOne = :userB AND f.userTwo = :userA))
+          AND f.status = 'ACCEPTED'
+    """)
     Optional<Friendship> findFriendshipBetweenUsers(@Param("userA") User userA, @Param("userB") User userB);
 }

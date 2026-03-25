@@ -114,6 +114,19 @@ public class PhotoService {
 
             Photo savedPhoto = photoRepository.save(newPhoto);
 
+            if (friendIds != null && !friendIds.isEmpty()) {
+                OffsetDateTime interactionTime = OffsetDateTime.now();
+                for (UUID friendId : friendIds) {
+                    userRepository.findById(friendId).flatMap(friend ->
+                            friendshipRepository.findFriendshipBetweenUsers(uploader, friend)
+                    ).ifPresent(friendship -> {
+                        friendship.setInteractionScore(friendship.getInteractionScore() + 1);
+                        friendship.setLastInteractedAt(interactionTime);
+                        friendshipRepository.save(friendship);
+                    });
+                }
+            }
+
             if (challengeId != null) {
                 // Finde die Challenge-Instanz
                 CustomPlaceChallenge challenge = challengeRepository.findById(challengeId)

@@ -522,5 +522,38 @@ public class FriendshipService {
 
         // 4. Sende Nachricht
         fcmService.sendPingNotification(targetFcmToken, sender, senderProfileUrl);
+
+        friendshipRepository.findFriendshipBetweenUsers(sender, target).ifPresent(friendship -> {
+            friendship.setInteractionScore(friendship.getInteractionScore() + 1);
+            friendship.setLastInteractedAt(OffsetDateTime.now());
+            friendshipRepository.save(friendship);
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserDTO> getFriendsForShareScreen(UUID currentUserId) {
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Holt die Freunde bereits in der PERFEKTEN Reihenfolge aus der Datenbank
+        List<Friendship> sortedFriendships = friendshipRepository.findFriendsSortedByInteraction(currentUser);
+
+        return sortedFriendships.stream()
+                .map(friendship -> {
+                    // Finde heraus, wer der "andere" in der Freundschaft ist
+                    User friend = friendship.getUserOne().getId().equals(currentUserId)
+                            ? friendship.getUserTwo()
+                            : friendship.getUserOne();
+
+                    // Generiere die Profilbild-URL (falls vorhanden)
+                    String profileUrl = null;
+                    if (friend.getProfileImageUrl() != null && !friend.getProfileImageUrl().isBlank()) {
+                        profileUrl = gcsStorageService.generateSignedUrl(
+                                "iris-profile-images-prod", friend.getProfileImageUrl(), 15, TimeUnit.MINUTES);
+                    }
+
+                    return new UserDTO(friend.getId(), friend.getUsername(), profileUrl);
+                })
+                .collect(Collectors.toList());
     }
 }

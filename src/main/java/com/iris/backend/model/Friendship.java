@@ -62,4 +62,10 @@ public class Friendship {
     protected void onCreate() {
         createdAt = OffsetDateTime.now();
     }
+
+    @Column(name = "interaction_score", nullable = false)
+    private Integer interactionScore = 0;
+
+    @Column(name = "last_interacted_at")
+    private OffsetDateTime lastInteractedAt;
 }
