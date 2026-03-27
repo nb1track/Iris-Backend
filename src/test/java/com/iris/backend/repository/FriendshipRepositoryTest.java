@@ -6,6 +6,8 @@ import com.iris.backend.model.enums.FriendshipStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -20,9 +22,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE) // Verhindert, dass Spring nach H2 sucht
 @Testcontainers
-@ActiveProfiles("test") // Nutzt die application-test.properties
+@ActiveProfiles("test")
 class FriendshipRepositoryTest {
 
     private static final DockerImageName POSTGIS_IMAGE = DockerImageName
