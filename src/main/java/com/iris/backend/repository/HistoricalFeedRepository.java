@@ -41,9 +41,12 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 NULL::timestamptz AS expires_at,
                 NULL::text AS custom_cover_image,
                 -- NEU: Zählt die einzigartigen Uploader für diesen Google Place
-                (SELECT COUNT(DISTINCT ph_sub.uploader_id) 
-                 FROM photos ph_sub 
-                 WHERE ph_sub.google_place_id = gp.id)::bigint AS participant_count
+                (SELECT COUNT(DISTINCT ph_sub.uploader_id)
+                 FROM photos ph_sub
+                 WHERE ph_sub.google_place_id = gp.id)::bigint AS participant_count,
+                NULL::text AS owner_id,
+                NULL::text AS owner_username,
+                NULL::text AS owner_profile_image_url
             FROM photos p
             JOIN google_places gp ON p.google_place_id = gp.id
             JOIN historical_points h ON ST_DWithin(
@@ -74,11 +77,15 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 cp.expires_at,
                 cp.cover_image_url AS custom_cover_image,
                 -- NEU: Zählt die einzigartigen Uploader für diesen Custom Place
-                (SELECT COUNT(DISTINCT ph_sub.uploader_id) 
-                 FROM photos ph_sub 
-                 WHERE ph_sub.custom_place_id = cp.id)::bigint AS participant_count
+                (SELECT COUNT(DISTINCT ph_sub.uploader_id)
+                 FROM photos ph_sub
+                 WHERE ph_sub.custom_place_id = cp.id)::bigint AS participant_count,
+                u.id::text AS owner_id,
+                u.username AS owner_username,
+                u.profile_image_url AS owner_profile_image_url
             FROM photos p
             JOIN custom_places cp ON p.custom_place_id = cp.id
+            JOIN users u ON cp.owner_id = u.id
             JOIN historical_points h ON ST_DWithin(
                 cp.location,
                 ST_MakePoint(h.longitude, h.latitude)::geography,
@@ -113,11 +120,14 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
                 MAX(participant_count) AS participant_count,
                 COUNT(photo_id) AS photo_count,
                 (ARRAY_AGG(storage_url ORDER BY uploaded_at DESC))[1] AS latest_user_photo,
-                MAX(uploaded_at) AS newest_photo_timestamp
+                MAX(uploaded_at) AS newest_photo_timestamp,
+                MAX(owner_id) AS owner_id,
+                MAX(owner_username) AS owner_username,
+                MAX(owner_profile_image_url) AS owner_profile_image_url
             FROM all_photos
             GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
         )
-        
+
         -- 5. Finale Selektion
         SELECT
             place_type AS placeType,
@@ -135,7 +145,10 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
             is_trending AS isTrending,
             is_live AS isLive,
             expires_at::timestamptz AS expiresAt,
-            participant_count AS participantCount
+            participant_count AS participantCount,
+            owner_id AS ownerId,
+            owner_username AS ownerUsername,
+            owner_profile_image_url AS ownerProfileImageUrl
         FROM grouped_places
         ORDER BY newest_photo_timestamp DESC
     """, nativeQuery = true)
@@ -160,5 +173,8 @@ public interface HistoricalFeedRepository extends JpaRepository<com.iris.backend
         boolean getIsLive();
         java.time.Instant getExpiresAt();
         Long getParticipantCount();
+        String getOwnerId();
+        String getOwnerUsername();
+        String getOwnerProfileImageUrl();
     }
 }

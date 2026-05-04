@@ -146,7 +146,8 @@ public class GoogleApiService {
                 false, // isTrending
                 true,  // isLive (Google POIs sind immer "live")
                 null,  // expiresAt
-                0L
+                0L,
+                null   // owner (nur für IRIS_SPOT)
         );
     }
 

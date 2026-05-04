@@ -1,6 +1,7 @@
 package com.iris.backend.service;
 
 import com.iris.backend.dto.HistoricalPointDTO;
+import com.iris.backend.dto.UserDTO;
 import com.iris.backend.dto.feed.GalleryFeedItemDTO; // NEUER IMPORT
 // import com.iris.backend.dto.FeedPlaceDTO; // ALTER IMPORT ENTFERNT
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -74,6 +75,15 @@ public class HistoricalFeedService {
                         if (projection.getExpiresAt() != null) {
                             expiresAt = projection.getExpiresAt().atOffset(ZoneOffset.UTC);
                         }
+                        UserDTO ownerDTO = null;
+                        if (projection.getOwnerId() != null) {
+                            ownerDTO = new UserDTO(
+                                    UUID.fromString(projection.getOwnerId()),
+                                    projection.getOwnerUsername(),
+                                    projection.getOwnerProfileImageUrl()
+                            );
+                        }
+
                         // Erstelle das finale DTO
                         return new GalleryFeedItemDTO(
                                 projection.getPlaceType(),
@@ -91,7 +101,8 @@ public class HistoricalFeedService {
                                 projection.getIsTrending(),
                                 projection.getIsLive(),
                                 expiresAt,
-                                projection.getParticipantCount() != null ? projection.getParticipantCount() : 0L
+                                projection.getParticipantCount() != null ? projection.getParticipantCount() : 0L,
+                                ownerDTO
                         );
                     })
                     .collect(Collectors.toList());
