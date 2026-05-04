@@ -1,5 +1,6 @@
 package com.iris.backend.service;
 
+import com.iris.backend.dto.UserDTO;
 import com.iris.backend.dto.feed.GalleryFeedItemDTO;
 import com.iris.backend.dto.feed.GalleryPlaceType;
 import com.iris.backend.model.CustomPlace;
@@ -126,7 +127,8 @@ public class GalleryFeedService {
                 false,
                 true,
                 null,
-                participantCount // Hier setzen wir jetzt den echten Wert statt 0L
+                participantCount,
+                null
         );
     }
 
@@ -157,6 +159,9 @@ public class GalleryFeedService {
         // NEU: Zähle Uploader für Custom Place (Nutzt die PhotoRepository Methode)
         long participantCount = photoRepository.countDistinctUploadersByCustomPlaceId(place.getId());
 
+        User owner = place.getOwner();
+        UserDTO ownerDTO = new UserDTO(owner.getId(), owner.getUsername(), owner.getProfileImageUrl());
+
         return new GalleryFeedItemDTO(
                 GalleryPlaceType.IRIS_SPOT,
                 place.getName(),
@@ -173,7 +178,8 @@ public class GalleryFeedService {
                 place.isTrending(),
                 place.isLive(),
                 place.getExpiresAt(),
-                participantCount
+                participantCount,
+                ownerDTO
         );
     }
 

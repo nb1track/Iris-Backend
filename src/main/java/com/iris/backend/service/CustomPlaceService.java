@@ -64,6 +64,7 @@ public class CustomPlaceService {
 
         CustomPlace newPlace = new CustomPlace();
         newPlace.setCreator(creator);
+        newPlace.setOwner(creator);
         newPlace.setName(request.name());
         newPlace.setLocation(geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude())));
         newPlace.setRadiusMeters(request.radiusMeters());

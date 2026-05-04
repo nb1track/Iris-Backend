@@ -1,5 +1,7 @@
 package com.iris.backend.dto.feed;
 
+import com.iris.backend.dto.UserDTO;
+
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -14,7 +16,6 @@ public record GalleryFeedItemDTO(
         String name,
         double latitude,
         double longitude,
-
         // --- Aggregierte Foto-Infos (aus der Query) ---
         String coverImageUrl,
         long photoCount,
@@ -33,6 +34,6 @@ public record GalleryFeedItemDTO(
         Boolean isTrending,
         Boolean isLive,
         OffsetDateTime expiresAt,
-
-        Long participantCount
+        Long participantCount,
+        UserDTO owner        // Aktueller Eigentümer (nur für IRIS_SPOT, sonst null)
 ) {}
