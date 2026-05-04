@@ -84,7 +84,7 @@ class CustomPlaceControllerTest {
         GalleryFeedItemDTO responseDto = new GalleryFeedItemDTO(
                 GalleryPlaceType.IRIS_SPOT, "Secret Rooftop", 46.9480, 7.4474,
                 "https://signed.url/cover.jpg", 0L, null, null, placeId,
-                null, 100, "PUBLIC", false, true, null, 0L
+                null, 100, "PUBLIC", false, true, null, 0L, null
         );
 
         when(customPlaceService.createCustomPlace(any(), any(), any())).thenReturn(mockEntity);
@@ -128,7 +128,7 @@ class CustomPlaceControllerTest {
         // --- ARRANGE ---
         GalleryFeedItemDTO spot = new GalleryFeedItemDTO(
                 GalleryPlaceType.IRIS_SPOT, "Trending", 0.0, 0.0, null, 5L,
-                null, null, UUID.randomUUID(), null, 50, "PUBLIC", true, true, null, 10L
+                null, null, UUID.randomUUID(), null, 50, "PUBLIC", true, true, null, 10L, null
         );
         when(galleryFeedService.getTrendingSpots()).thenReturn(List.of(spot));
 

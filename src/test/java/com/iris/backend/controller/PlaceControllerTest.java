@@ -134,7 +134,7 @@ class PlaceControllerTest {
         // --- ARRANGE ---
         GalleryFeedItemDTO mockPlace = new GalleryFeedItemDTO(
                 GalleryPlaceType.GOOGLE_POI, "Eiffelturm", 48.8584, 2.2945,
-                null, 0L, null, 1L, null, "Paris", 50, null, false, false, null, 0L
+                null, 0L, null, 1L, null, "Paris", 50, null, false, false, null, 0L, null
         );
 
         when(galleryFeedService.getTaggablePlaces(48.8584, 2.2945)).thenReturn(List.of(mockPlace));

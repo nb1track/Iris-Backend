@@ -58,7 +58,7 @@ class FeedControllerTest {
         GalleryFeedItemDTO mockItem = new GalleryFeedItemDTO(
                 GalleryPlaceType.GOOGLE_POI, "Zytglogge", 46.9480, 7.4474,
                 "https://signed.url/image.jpg", 15L, OffsetDateTime.now(),
-                1L, null, "Bärenplatz, Bern", null, null, false, false, null, 3L
+                1L, null, "Bärenplatz, Bern", null, null, false, false, null, 3L, null
         );
 
         when(historicalFeedService.generateHistoricalFeed(anyList())).thenReturn(List.of(mockItem));
