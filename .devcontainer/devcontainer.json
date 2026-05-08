@@ -1,0 +1,15 @@
+{
+  "name": "Iris Backend",
+  "image": "mcr.microsoft.com/devcontainers/java:21-bullseye",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21",
+      "jdkDistro": "tem"
+    }
+  },
+  "remoteEnv": {
+    "SPRING_APPLICATION_JSON": "${localEnv:SPRING_APPLICATION_JSON}",
+    "SPRING_DATASOURCE_PASSWORD": "${localEnv:SPRING_DATASOURCE_PASSWORD}",
+    "GCP_MAPS_API_KEY": "${localEnv:GCP_MAPS_API_KEY}"
+  }
+}
