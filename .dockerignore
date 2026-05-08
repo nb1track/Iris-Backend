@@ -1,0 +1,9 @@
+.git
+.gitignore
+.gitattributes
+.idea
+*.iml
+target
+*.log
+.env
+secrets/
