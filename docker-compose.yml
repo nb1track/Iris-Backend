@@ -1,0 +1,12 @@
+services:
+  iris-backend:
+    build: .
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - SPRING_APPLICATION_JSON=${SPRING_APPLICATION_JSON}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - GCP_MAPS_API_KEY=${GCP_MAPS_API_KEY}
+      - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-service-account.json
+    volumes:
+      - ./secrets/gcp-service-account.json:/secrets/gcp-service-account.json:ro
